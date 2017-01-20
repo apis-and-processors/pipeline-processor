@@ -29,7 +29,7 @@ addons:
   coverity_scan:
     project:
       name: "apis-and-processors/pipeline-processor"
-      description: "Type checked pipeline processor for Guava Functions"
+      description: "Type checked pipeline for processing Guava Functions"
     notification_email: christoforever@gmail.com
     build_command:  ./gradlew -s -Dorg.gradle.daemon=false build
     branch_pattern: coverity_scan
