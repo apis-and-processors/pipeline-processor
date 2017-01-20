@@ -5,10 +5,10 @@ env:
   global:
    # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
    #   via the "travis encrypt" command using the project repo's public key
-   - secure: "ZHUfSdzANwK3B6fUFz3c2wYUGhoV7xegIrRSitzgsP0/xiLz+sX/FaSfOGmZERuvPAUntIa71J8VJDcVaVUey3rgz4hBry5y2kd2oP97Sz4A02BqPLvhi9E/B4wL0cj+qd9KGGs/dmdkla/JDLeMo2t3bStgIYlQtlauSvxzZT1ZDKgbP8Ji5j+s8bqqAWXEkq7hQGLAdfX0xdzAgJtd2nZ+m06RW0HYKzMC3Z7zc1dnPtxxJeuW5ajUz4EhyrrGKj27XPFvytq0r2WPxScGlwH4nO2d1YMQbAOKFwJJsRXJDFFz1mE2n6ThpACZe4MY35KG6xPHS2F3EiOagLhrG/HUrcP0ifIPiVltpgHr0z1UVrDMBkQ66h2xx8r30OttK2771XrpQ6LnK/u00kOxmmgEx9OyCq/AsFRD4Du84Qa8gsYNMV/uu0fenqHs1Wky44v0MXcpIQd5cPlDRngwgezbM3LAaPbzjYPFV1zoIfmaDGQ6fudna9Z9DIMRIY/A/TN4tLvuZvewOelqVQptSN5Zynjia04zODX+Uyt5tlo1jJ+7ORcTNQdxJl2+f4E+AP3bZcINx6bdNQEh6CpPn2NEwHoWQlLrtdyuN7/RvY2jfZatlmmAJOAss3Hn/iWl6HnxPGcwewCD4D+3eQpSdfjbznlGqXwLUvM03gHOyi8="
+   - secure: "HeIfsi3ZMZX97TWe29MCExBHS1N+Hpvty5y+R1QQIzPyTDv5Kzb3zMExh5Bxr5VxIYsBk8XCIuAgM6MdVYHTabKfnimcaPl8AnMFUz8AfsJCZfYZmIf0bQ6Int858tqMCw6Q4o7iJh8PPypKQXjeeIz9kpgfdj/UCdrdntcro0XIaXxGUqD6ctZD8tzztT7H4JIF1XjlbomP2yvdIvZr9XsTqK1irqFfAf/bfGDrbOyvAXuB0Ey+mrvu6Xh6ffsgV3bZ+0kd5iUYpuh3jg5jsxJSWCk5Kxf5XPEkgBxEPOYlWYTjmrnCbgM87EVECspeZQnkN4c1D96c8NsH4Olj6stMi0JsAf3UrfRMqDaZPWlJ7U+AenGP99RQQA8ZOaZodAAS8ED21wG6iG5zwcgObiTvKF0SdcJyOWIAzW3aa15Ft2kLTlCfuwFwfB3DKDDgmMlajnJJyhQ1MA4ZtfZTxFMXYZwakdc1VDVpoIqji13snhnxmse8Au0n0yBuhyqnvG4Zg3e0WXsTNUrJIca6rYsNOk9pcUnEsi11RSvl5OS7/2xt1VdUfhva0nGtq+eyxWb7QMQQUtgSM4k0iXQ+f9ynyQpppRxO0oW3VlAQwZeZfchHReu1+pOSay6nK7J2dmvEvJHVLXfwq9EoOi1r0zTiRw560sTDFGqvzRV9CDE="
 
 
-script: ./gradlew -s -Dorg.gradle.daemon=false build
+script: ./gradlew -s -Dorg.gradle.daemon=false clean build publishToMavenLocal
 
 before_install:
       - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
@@ -28,8 +28,8 @@ after_success:
 addons:
   coverity_scan:
     project:
-      name: "lily-mistral/sample-java-project"
-      description: "Sample project for tech processes"
-    notification_email: petehayes@gmail.com
+      name: "apis-and-processors/pipeline-processor"
+      description: "Type checked pipeline processor for Guava Functions"
+    notification_email: christoforever@gmail.com
     build_command:  ./gradlew -s -Dorg.gradle.daemon=false build
     branch_pattern: coverity_scan
