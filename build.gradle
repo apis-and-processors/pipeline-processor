@@ -24,14 +24,16 @@ apply from: "$rootDir/gradle/publishing.gradle"
 apply from: "$rootDir/gradle/release.gradle"
 
 repositories {
+    mavenLocal()
     jcenter()
     mavenCentral()
 }
 
 dependencies {
+    compile group: "com.github", name: "type-utils", version: "0.0.4-SNAPSHOT", changing: true
     compile 'org.slf4j:slf4j-api:1.7.21'
-
-    testCompile 'junit:junit:4.12'
+    testCompile ('org.testng:testng:6.8.21') 
+    testCompile ('org.assertj:assertj-core:1.7.0') 
 }
 
 ext.compatibilityVersion = '1.8'
@@ -65,6 +67,7 @@ tasks.withType(JavaCompile) {
 }
 
 tasks.withType(Test) {
+    useTestNG()
     testLogging {
         showStandardStreams = true
         events 'started', 'passed', 'failed'
