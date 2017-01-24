@@ -4,7 +4,7 @@
 [![Download](https://api.bintray.com/packages/apis-and-processors/java-libraries/pipeline-processor/images/download.svg) ](https://bintray.com/apis-and-processors/java-libraries/pipeline-processor/_latestVersion)
 
 # pipeline-processor
-Type checked pipeline for processing Guava Functions
+Type checked pipeline for processing Functions (Guava or Java)
 
 ## Documentation
 javadocs can be found via [github pages here](https://apis-and-processors.github.io/pipeline-processor/docs/javadoc/)
