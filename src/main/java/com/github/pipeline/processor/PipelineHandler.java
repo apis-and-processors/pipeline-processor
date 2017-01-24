@@ -5,8 +5,6 @@
  */
 package com.github.pipeline.processor;
 
-import com.google.common.base.Function;
-
 /**
  *
  * @author cdancy
@@ -17,17 +15,17 @@ import com.google.common.base.Function;
  * @param <T>
  * @param <V>
  */
-public class PipelineHandler<T, V> {
+public class PipelineHandler <T, V> {
 
-    private final Function<T, V> function;    
+    private final Object function;
     private final Object retryPolicy;
 
-    public PipelineHandler(Function<T, V> function, Object retryPolicy) {
+    public PipelineHandler(Object function, Object retryPolicy) {
         this.function = function;
         this.retryPolicy = retryPolicy;
     }
     
-    public Function function() {
+    public Object function() {
         return function;
     }
     
@@ -35,11 +33,25 @@ public class PipelineHandler<T, V> {
         return retryPolicy;
     }
     
-    public V process(T t) {
-        return function.apply(t);
+    public V output(T t) {
+        if (function == null) {
+            throw new NullPointerException("Cannot have null function");
+        } else if (function instanceof com.google.common.base.Function) {
+            com.google.common.base.Function worker = (com.google.common.base.Function)function;
+            return (V) worker.apply(t);
+        } else if (function instanceof java.util.function.Function) {
+            java.util.function.Function worker = (java.util.function.Function)function;
+            return (V) worker.apply(t);
+        } else {
+            throw new ClassCastException("Cannot cast '" + function + "' to either an instance of com.google.common.base.Function or java.util.function.Function");
+        }
     }
     
-    public static <T, V> PipelineHandler newInstance(Function<T, V> function, Object retryPolicy) {
+    public static <T, V> PipelineHandler newInstance(com.google.common.base.Function<T, V> function, Object retryPolicy) {
+        return new PipelineHandler(function, retryPolicy);
+    }
+    
+    public static <T, V> PipelineHandler newInstance(java.util.function.Function<T, V> function, Object retryPolicy) {
         return new PipelineHandler(function, retryPolicy);
     }
 }

@@ -14,7 +14,7 @@ import org.testng.annotations.Test;
  */
 public class PipelineProcessorTest {
    
-    class Handler1 implements Function<String, Integer> {
+    class Handler1 implements java.util.function.Function<String, Integer> {
         @Override
         public Integer apply(String object) {
             return 123;
@@ -45,7 +45,8 @@ public class PipelineProcessorTest {
         
         PipelineProcessor.Builder<String, String> builder2 = PipelineProcessor.<String, String> builder();
         
-        Object obj = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).handler(new Handler3()).input("hello").output();
+        //Object obj = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).handler(new Handler3()).output("hello");
+        Object obj = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).output(null);
         System.out.println("output: " + obj);
     }
 }

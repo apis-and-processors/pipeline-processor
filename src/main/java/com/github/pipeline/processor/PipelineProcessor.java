@@ -40,13 +40,12 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
     }
     
     @Override
-    public Object process(Object obj) {
+    public Object output(Object input) {
         
-        // 1.) 
         for(PipelineHandler foundFunction : pipeline) {
             
             System.out.println("Found function: " + foundFunction.getClass());
-            ClassType clazzType = TypeUtils.parseClassType(foundFunction.function()).firstSubTypeMatching(".*Function.*");
+            ClassType clazzType = TypeUtils.parseClassType(foundFunction.function()).firstSubTypeMatching(".*Function");
             if (clazzType != null) {
                 System.out.println("Found ClassType: " + clazzType + ", subTypes: " + clazzType.subTypes().size());
             }
@@ -62,29 +61,37 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
     
         private final Logger LOGGER = Logger.getLogger(PipelineProcessor.class.getName());
         private final ImmutableList.Builder<PipelineHandler> pipelineHandlers = ImmutableList.builder();
-        private Object input;
+        
+        /**
+         * Add handler to this pipeline
+         * 
+         * @param pipelineHandler handler to append to the end of this pipeline.
+         * @return this Builder.
+         */
+        public Builder handler(Class pipelineHandler) {
+            checkNotNull(pipelineHandler, "pipelineHandler cannot be null");
+            
+            if (com.google.common.base.Function.class.isAssignableFrom(pipelineHandler)) {
+                com.google.common.base.Function function = (com.google.common.base.Function)ReflectionUtils.newInstance(pipelineHandler);
+                return handler(function);
+            } else if (java.util.function.Function.class.isAssignableFrom(pipelineHandler)) {
+                java.util.function.Function function = (java.util.function.Function)ReflectionUtils.newInstance(pipelineHandler);
+                return handler(function);
+            } else {
+                throw new ClassCastException("pipelineHandler must be either an instance of com.google.common.base.Function or java.util.function.Function");
+            }
+        }
 
         /**
-         * Optional initial input to the pipeline
-         * 
-         * @param input Optional initial input to first handler of pipeline
-         * @return this Builder.
-         */
-        public Builder input(Object input) {
-            this.input = checkNotNull(input, "input cannot be null");
-            return this;
-        }
-        
-        /**
          * Add handler to this pipeline
          * 
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
          */
-        public Builder handler(Class<? extends Function> pipelineHandler) {
+        public Builder handler(final com.google.common.base.Function<?, ?> pipelineHandler) {
             checkNotNull(pipelineHandler, "pipelineHandler cannot be null");
-            final Function<?, ?> function = ReflectionUtils.newInstance(pipelineHandler);
-            return handler(function);
+            PipelineHandler handler = PipelineHandler.newInstance(pipelineHandler, null);
+            return handler(handler);
         }
         
         /**
@@ -93,7 +100,7 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
          */
-        public Builder handler(final Function<?, ?> pipelineHandler) {
+        public Builder handler(final java.util.function.Function<?, ?> pipelineHandler) {
             checkNotNull(pipelineHandler, "pipelineHandler cannot be null");
             PipelineHandler handler = PipelineHandler.newInstance(pipelineHandler, null);
             return handler(handler);
@@ -126,10 +133,11 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
         /**
          * Convenience method for getting the output of the PipelineProcessor
          * 
+         * @param input
          * @return output of PipelineProcessor
          */
-        public Object output() {
-            return build().process(input);
+        public Object output(Object input) {
+            return build().output(input);
         }
     }
 }
