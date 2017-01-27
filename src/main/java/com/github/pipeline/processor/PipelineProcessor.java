@@ -17,12 +17,12 @@
 
 package com.github.pipeline.processor;
 
-import com.github.type.utils.ClassType;
-import com.github.type.utils.ReflectionUtils;
-import com.github.type.utils.TypeUtils;
-import com.google.common.base.Function;
 import static com.google.common.base.Preconditions.checkNotNull;
+
+import com.github.pipeline.processor.utils.PipelineUtils;
+import com.github.type.utils.ReflectionUtils;
 import com.google.common.collect.ImmutableList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,17 +39,21 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
         this.pipeline = pipeline;        
     }
     
-    @Override
-    public Object output(Object input) {
+    public Object process() {
+        return process(null, null);
+    }
         
-        for(PipelineHandler foundFunction : pipeline) {
+    @Override
+    public Object process(Object initialInput) {
+        return process(initialInput, null);
+    }
+    
+    public Object process(Object initialInput, Object expectedOutputType) {
+        
+        // 1.) pre-execution check for type sanity
+        List<Integer> requiredExecTimeIndexChecks = PipelineUtils.typeCheckPipeline(pipeline, initialInput, expectedOutputType);
             
-            System.out.println("Found function: " + foundFunction.getClass());
-            ClassType clazzType = TypeUtils.parseClassType(foundFunction.function()).firstSubTypeMatching(".*Function");
-            if (clazzType != null) {
-                System.out.println("Found ClassType: " + clazzType + ", subTypes: " + clazzType.subTypes().size());
-            }
-        }
+        System.out.println("Checks on the following are needed: " + requiredExecTimeIndexChecks);
         return null;
     }
     
@@ -128,16 +132,6 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
          */
         public <T, V> PipelineProcessor build() {
             return new PipelineProcessor(pipelineHandlers.build());
-        }
-        
-        /**
-         * Convenience method for getting the output of the PipelineProcessor
-         * 
-         * @param input
-         * @return output of PipelineProcessor
-         */
-        public Object output(Object input) {
-            return build().output(input);
         }
     }
 }

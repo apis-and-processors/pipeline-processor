@@ -30,7 +30,7 @@ repositories {
 }
 
 dependencies {
-    compile group: "com.github", name: "type-utils", version: "0.0.4-SNAPSHOT", changing: true
+    compile group: "com.github", name: "type-utils", version: "0.0.5-SNAPSHOT", changing: true
     compile 'org.slf4j:slf4j-api:1.7.21'
     testCompile ('org.testng:testng:6.8.21') 
     testCompile ('org.assertj:assertj-core:1.7.0') 

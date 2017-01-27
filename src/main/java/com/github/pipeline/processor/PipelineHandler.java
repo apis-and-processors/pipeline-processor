@@ -6,12 +6,7 @@
 package com.github.pipeline.processor;
 
 /**
- *
- * @author cdancy
- */
-/**
- *
- * @author github.
+ * 
  * @param <T>
  * @param <V>
  */
@@ -33,15 +28,15 @@ public class PipelineHandler <T, V> {
         return retryPolicy;
     }
     
-    public V output(T t) {
+    public V process(T input) {
         if (function == null) {
             throw new NullPointerException("Cannot have null function");
         } else if (function instanceof com.google.common.base.Function) {
             com.google.common.base.Function worker = (com.google.common.base.Function)function;
-            return (V) worker.apply(t);
+            return (V) worker.apply(input);
         } else if (function instanceof java.util.function.Function) {
             java.util.function.Function worker = (java.util.function.Function)function;
-            return (V) worker.apply(t);
+            return (V) worker.apply(input);
         } else {
             throw new ClassCastException("Cannot cast '" + function + "' to either an instance of com.google.common.base.Function or java.util.function.Function");
         }

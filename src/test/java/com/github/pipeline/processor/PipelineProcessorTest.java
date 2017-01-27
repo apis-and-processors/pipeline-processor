@@ -14,23 +14,23 @@ import org.testng.annotations.Test;
  */
 public class PipelineProcessorTest {
    
-    class Handler1 implements java.util.function.Function<String, Integer> {
+    class Handler1 implements java.util.function.Function<Integer, Integer> {
         @Override
-        public Integer apply(String object) {
+        public Integer apply(Integer object) {
             return 123;
         }
     }
     
-    class Handler2 implements Function<Void, Boolean> {
+    class Handler2 implements Function<Object, Boolean> {
         @Override
-        public Boolean apply(Void object) {
-            return false;
+        public Boolean apply(Object object) {
+            return Boolean.FALSE;
         }
     }
         
-    class Handler3 implements Comparable, Function<Object, String> {
+    class Handler3 implements Comparable, Function<Boolean, String> {
         @Override
-        public String apply(Object object) {
+        public String apply(Boolean object) {
             return "world";
         }
 
@@ -46,7 +46,7 @@ public class PipelineProcessorTest {
         PipelineProcessor.Builder<String, String> builder2 = PipelineProcessor.<String, String> builder();
         
         //Object obj = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).handler(new Handler3()).output("hello");
-        Object obj = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).output(null);
+        Object obj = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build().process(123, int.class);
         System.out.println("output: " + obj);
     }
 }
