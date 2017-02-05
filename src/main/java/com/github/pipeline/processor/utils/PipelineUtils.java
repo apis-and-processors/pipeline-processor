@@ -5,6 +5,7 @@
  */
 package com.github.pipeline.processor.utils;
 
+import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
 import com.github.pipeline.processor.PipelineHandler;
 import com.github.pipeline.processor.PipelineProcessor;
 import com.github.pipeline.processor.exceptions.CheckTimeTypeMismatchException;
@@ -20,9 +21,7 @@ import java.util.Map;
  * @author cdancy
  */
 public class PipelineUtils {
-    
-    private static final String FUNCTION_REGEX = "^(com.google.common.base.|java.util.function.)Function$";
-    
+        
     public static Map<Integer, ClassType> typeCheckPipeline(List<? extends PipelineHandler> pipeline, Object initialInput, Object expectedOutputType) {
         Map<Integer, ClassType> runtimePipelineChecks = Maps.newHashMap();
         

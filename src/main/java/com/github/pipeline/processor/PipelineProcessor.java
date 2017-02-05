@@ -17,14 +17,17 @@
 
 package com.github.pipeline.processor;
 
+import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
 import com.github.pipeline.processor.exceptions.NullNotAllowedException;
 import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.github.pipeline.processor.utils.PipelineUtils;
 import com.github.type.utils.ClassType;
+import com.github.type.utils.PrimitiveTypes;
 import com.github.type.utils.ReflectionUtils;
 import com.github.type.utils.TypeUtils;
+import com.github.type.utils.domain.Null;
 import com.github.type.utils.exceptions.TypeMismatchException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,14 +66,17 @@ public class PipelineProcessor {
         // 1.) pre-execution check for type sanity
         Map<Integer, ClassType> runtimePiplineChecks = PipelineUtils.typeCheckPipeline(pipeline, initialInput, outputType);
             
-        System.out.println("Checks on the following are needed: " + runtimePiplineChecks);
         Object lastOutput = initialInput;
         for(int i = 0; i < pipeline.size(); i++) {
             PipelineHandler handle = pipeline.get(i);
             
             // ensure null inputs are allowed if applicable
             if (lastOutput == null && !handle.inputNullable()) {
-                throw new NullNotAllowedException("PipelineHandler (" + handle.id() + ") at index " + i + " does not permit NULL inputs");
+                ClassType inputType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
+                if (!(inputType.toString().equals(Void.class.getName()) 
+                        || inputType.toString().equals(Null.class.getName()))) {
+                    throw new NullNotAllowedException("PipelineHandler (" + handle.id() + ") at index " + i + " does not permit NULL inputs");
+                }                
             }
             
             // ensure runtime check passes
@@ -101,7 +107,7 @@ public class PipelineProcessor {
             // process function
             lastOutput = handle.process(lastOutput);
             
-            // ensure null outputs are allowed in applicable
+            // ensure null outputs are allowed if applicable
             if (lastOutput == null && !handle.outputNullable()) {
                 throw new NullNotAllowedException("PipelineHandler (" + handle.id() + ") at index " + i + " does not permit NULL outputs");
             }

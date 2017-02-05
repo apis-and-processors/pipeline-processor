@@ -5,6 +5,7 @@
  */
 package com.github.pipeline.processor;
 
+import com.github.type.utils.domain.Null;
 import com.google.common.base.Function;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,9 +28,9 @@ public class PipelineProcessorTest {
         }
     }
     
-    class Handler2 implements Function<Void, Boolean> {
+    class Handler2 implements Function<Null, Boolean> {
         @Override
-        public Boolean apply(Void object) {
+        public Boolean apply(Null object) {
             System.out.println("Input: " + object);
             return Boolean.FALSE;
         }

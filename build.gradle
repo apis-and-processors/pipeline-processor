@@ -30,7 +30,7 @@ repositories {
 }
 
 dependencies {
-    compile group: "com.github", name: "type-utils", version: "0.0.5-SNAPSHOT", changing: true
+    compile group: "com.github", name: "type-utils", version: "0.0.6-SNAPSHOT", changing: true
     compile 'com.google.code.findbugs:jsr305:3.0.1'
     compile 'net.jodah:failsafe:1.0.3'
     compile 'org.slf4j:slf4j-api:1.7.21'
