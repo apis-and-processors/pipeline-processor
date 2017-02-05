@@ -22,7 +22,7 @@ public class PipelineProcessorTest {
         
         @Override
         @Nullable
-        public Object apply(@Nullable String object) {
+        public Object apply(String object) {
             System.out.println("Input: " + object);
             return null;
         }
@@ -56,7 +56,7 @@ public class PipelineProcessorTest {
         
         PipelineProcessor processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).outputType(String.class).build();
         Object objInput = "Hello World";
-        Object obj = processor.input(null).output();
+        Object obj = processor.input(objInput).output();
 
         System.out.println("output: " + obj);
     }

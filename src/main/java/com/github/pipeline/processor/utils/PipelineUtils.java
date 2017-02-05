@@ -22,7 +22,7 @@ import java.util.Map;
  */
 public class PipelineUtils {
         
-    public static Map<Integer, ClassType> typeCheckPipeline(List<? extends PipelineHandler> pipeline, Object initialInput, Object expectedOutputType) {
+    public static Map<Integer, ClassType> typeCheckPipeline(List<? extends PipelineHandler> pipeline, Object expectedOutputType) {
         Map<Integer, ClassType> runtimePipelineChecks = Maps.newHashMap();
         
         PipelineHandler previousHandler = null;
@@ -33,16 +33,6 @@ public class PipelineUtils {
             if (previousHandler == null) {
                 previousHandler = currentHandler;
                 previousClazzType = previousHandler.classType().firstSubTypeMatching(FUNCTION_REGEX); 
-                if (initialInput != null) {
-                    ClassType inputClazzType = TypeUtils.parseClassType(initialInput);
-                    try {
-                        inputClazzType.compare(previousClazzType.subTypeAtIndex(0));
-                    } catch (TypeMismatchException tme) {
-                        throw new CheckTimeTypeMismatchException("Initial input to " + PipelineProcessor.class.getSimpleName() + " " 
-                                + "type does not match Handler (" 
-                                + previousHandler.getClass().getName() + ") at index " + i + " inputs.", tme);
-                    } 
-                }
                 continue;
             } 
 

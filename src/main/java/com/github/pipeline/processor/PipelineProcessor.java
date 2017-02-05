@@ -21,10 +21,10 @@ import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
 import com.github.pipeline.processor.exceptions.NullNotAllowedException;
 import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkArgument;
 
 import com.github.pipeline.processor.utils.PipelineUtils;
 import com.github.type.utils.ClassType;
-import com.github.type.utils.PrimitiveTypes;
 import com.github.type.utils.ReflectionUtils;
 import com.github.type.utils.TypeUtils;
 import com.github.type.utils.domain.Null;
@@ -45,12 +45,15 @@ import javax.annotation.Nullable;
 public class PipelineProcessor {
     
     private final List<? extends PipelineHandler> pipeline;
+    private final Class<?> outputType;
+    private final Map<Integer, ClassType> runtimePipelineChecks;
+
     private volatile Object initialInput;
-    private volatile Class<?> outputType;
             
     public PipelineProcessor(List<? extends PipelineHandler> pipeline, @Nullable Class<?> outputType) {
         this.pipeline = pipeline;
         this.outputType = outputType;
+        this.runtimePipelineChecks = PipelineUtils.typeCheckPipeline(pipeline, outputType);
     }
     
     public PipelineProcessor input(@Nullable Object initialInput) {
@@ -59,17 +62,11 @@ public class PipelineProcessor {
     }
        
     public Optional<Object> output() {
-        
-        System.out.println("InputType: " + TypeUtils.parseClassType(initialInput));
-        System.out.println("OutputType: " + TypeUtils.parseClassType(outputType));
-        
-        // 1.) pre-execution check for type sanity
-        Map<Integer, ClassType> runtimePiplineChecks = PipelineUtils.typeCheckPipeline(pipeline, initialInput, outputType);
-            
+
         Object lastOutput = initialInput;
         for(int i = 0; i < pipeline.size(); i++) {
             PipelineHandler handle = pipeline.get(i);
-            
+                        
             // ensure null inputs are allowed if applicable
             if (lastOutput == null && !handle.inputNullable()) {
                 ClassType inputType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
@@ -80,25 +77,29 @@ public class PipelineProcessor {
             }
             
             // ensure runtime check passes
-            ClassType expectedClassType = runtimePiplineChecks.get(i);
+            ClassType expectedClassType = runtimePipelineChecks.get(i);
+            if (expectedClassType == null && i == 0) {
+                expectedClassType = pipeline.get(0).classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
+            }
+            
             if (expectedClassType != null) {
-                ClassType inputClassType = TypeUtils.parseClassType(lastOutput);
+                ClassType handlerClassType = TypeUtils.parseClassType(lastOutput);
                 
                 // ignore Null class as we would have not been able 
                 // to reach this point if they weren't allowed
-                if (!inputClassType.toString().equals(com.github.type.utils.domain.Null.class.getName())) {
+                if (!handlerClassType.toString().equals(com.github.type.utils.domain.Null.class.getName())) {
                     try {
-                        inputClassType.compare(expectedClassType);
+                        handlerClassType.compare(expectedClassType);
                     } catch (TypeMismatchException tme) {
                         String message;
                         if (i == 0) {
-                            message = "Initial input to " + PipelineProcessor.class.getSimpleName() + " ";
+                            message = "Initial input to " + PipelineProcessor.class.getSimpleName() + " does ";
                         } else {
                             int index = i - 1;
-                            message = "Handler (" + pipeline.get(index).id() + ") at index " + index + " ";
+                            message = "Handler (" + pipeline.get(index).id() + ") at index " + index + " outputs do ";
                         }
                         throw new ProcessTimeTypeMismatchException(message 
-                                + "outputs do not match Handler (" 
+                                + "not match Handler (" 
                                 + handle.id() + ") at index " + i + " inputs.", tme);
                     } 
                 }
@@ -204,6 +205,7 @@ public class PipelineProcessor {
          * @return newly created PipelineProcessor.
          */
         public <T, V> PipelineProcessor build() {
+            checkArgument(!pipelineHandlers.isEmpty(), "Cannot build processor with no handlers");
             return new PipelineProcessor(Collections.unmodifiableList(pipelineHandlers), this.outputType);
         }
     }
