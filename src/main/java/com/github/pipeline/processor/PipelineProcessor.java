@@ -17,44 +17,97 @@
 
 package com.github.pipeline.processor;
 
+import com.github.pipeline.processor.exceptions.NullNotAllowedException;
+import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.github.pipeline.processor.utils.PipelineUtils;
+import com.github.type.utils.ClassType;
 import com.github.type.utils.ReflectionUtils;
-import com.google.common.collect.ImmutableList;
+import com.github.type.utils.TypeUtils;
+import com.github.type.utils.exceptions.TypeMismatchException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 /**
  *
  * @author github.
  */
-public class PipelineProcessor extends PipelineHandler<Object, Object> {
+public class PipelineProcessor {
     
-    private final ImmutableList<? extends PipelineHandler> pipeline;
+    private final List<? extends PipelineHandler> pipeline;
+    private volatile Object initialInput;
+    private volatile Class<?> outputType;
             
-    public PipelineProcessor(ImmutableList<? extends PipelineHandler> pipeline) {
-        super(null, null);
-        this.pipeline = pipeline;        
+    public PipelineProcessor(List<? extends PipelineHandler> pipeline, @Nullable Class<?> outputType) {
+        this.pipeline = pipeline;
+        this.outputType = outputType;
     }
     
-    public Object process() {
-        return process(null, null);
+    public PipelineProcessor input(@Nullable Object initialInput) {
+        this.initialInput = initialInput;
+        return this;
     }
+       
+    public Optional<Object> output() {
         
-    @Override
-    public Object process(Object initialInput) {
-        return process(initialInput, null);
-    }
-    
-    public Object process(Object initialInput, Object expectedOutputType) {
+        System.out.println("InputType: " + TypeUtils.parseClassType(initialInput));
+        System.out.println("OutputType: " + TypeUtils.parseClassType(outputType));
         
         // 1.) pre-execution check for type sanity
-        List<Integer> requiredExecTimeIndexChecks = PipelineUtils.typeCheckPipeline(pipeline, initialInput, expectedOutputType);
+        Map<Integer, ClassType> runtimePiplineChecks = PipelineUtils.typeCheckPipeline(pipeline, initialInput, outputType);
             
-        System.out.println("Checks on the following are needed: " + requiredExecTimeIndexChecks);
-        return null;
+        System.out.println("Checks on the following are needed: " + runtimePiplineChecks);
+        Object lastOutput = initialInput;
+        for(int i = 0; i < pipeline.size(); i++) {
+            PipelineHandler handle = pipeline.get(i);
+            
+            // ensure null inputs are allowed if applicable
+            if (lastOutput == null && !handle.inputNullable()) {
+                throw new NullNotAllowedException("PipelineHandler (" + handle.id() + ") at index " + i + " does not permit NULL inputs");
+            }
+            
+            // ensure runtime check passes
+            ClassType expectedClassType = runtimePiplineChecks.get(i);
+            if (expectedClassType != null) {
+                ClassType inputClassType = TypeUtils.parseClassType(lastOutput);
+                
+                // ignore Null class as we would have not been able 
+                // to reach this point if they weren't allowed
+                if (!inputClassType.toString().equals(com.github.type.utils.domain.Null.class.getName())) {
+                    try {
+                        inputClassType.compare(expectedClassType);
+                    } catch (TypeMismatchException tme) {
+                        String message;
+                        if (i == 0) {
+                            message = "Initial input to " + PipelineProcessor.class.getSimpleName() + " ";
+                        } else {
+                            int index = i - 1;
+                            message = "Handler (" + pipeline.get(index).id() + ") at index " + index + " ";
+                        }
+                        throw new ProcessTimeTypeMismatchException(message 
+                                + "outputs do not match Handler (" 
+                                + handle.id() + ") at index " + i + " inputs.", tme);
+                    } 
+                }
+            }
+                    
+            // process function
+            lastOutput = handle.process(lastOutput);
+            
+            // ensure null outputs are allowed in applicable
+            if (lastOutput == null && !handle.outputNullable()) {
+                throw new NullNotAllowedException("PipelineHandler (" + handle.id() + ") at index " + i + " does not permit NULL outputs");
+            }
+        }        
+        
+        return Optional.ofNullable(lastOutput);
     }
     
     public static <T, V> Builder<T, V> builder() {
@@ -64,7 +117,8 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
     public static class Builder<T, V> {
     
         private final Logger LOGGER = Logger.getLogger(PipelineProcessor.class.getName());
-        private final ImmutableList.Builder<PipelineHandler> pipelineHandlers = ImmutableList.builder();
+        private final List<PipelineHandler> pipelineHandlers = new ArrayList<>();
+        private Class<?> outputType = null;
         
         /**
          * Add handler to this pipeline
@@ -124,6 +178,19 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
         }
         
         /**
+         * The outputType to check against output of pipeline. Useful when the output 
+         * type is an Object but we want to ensure a specific type.
+         * 
+         * @param outputType optional outputType we expect from pipeline. 
+         * @return this Builder.
+         */
+        public Builder outputType(final Class<?> outputType) {
+            checkNotNull(outputType, "pipelineHandler cannot be null");
+            this.outputType = outputType;
+            return this;
+        }
+        
+        /**
          * Build a PipelineProcessor from passed build parameters.
          * 
          * @param <T>
@@ -131,7 +198,7 @@ public class PipelineProcessor extends PipelineHandler<Object, Object> {
          * @return newly created PipelineProcessor.
          */
         public <T, V> PipelineProcessor build() {
-            return new PipelineProcessor(pipelineHandlers.build());
+            return new PipelineProcessor(Collections.unmodifiableList(pipelineHandlers), this.outputType);
         }
     }
 }

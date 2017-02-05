@@ -6,6 +6,9 @@
 package com.github.pipeline.processor;
 
 import com.google.common.base.Function;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.testng.annotations.Test;
 
 /**
@@ -14,16 +17,20 @@ import org.testng.annotations.Test;
  */
 public class PipelineProcessorTest {
    
-    class Handler1 implements java.util.function.Function<Integer, Integer> {
+    class Handler1 implements java.util.function.Function<String, Object> {
+        
         @Override
-        public Integer apply(Integer object) {
-            return 123;
+        @Nullable
+        public Object apply(@Nullable String object) {
+            System.out.println("Input: " + object);
+            return null;
         }
     }
     
-    class Handler2 implements Function<Object, Boolean> {
+    class Handler2 implements Function<Void, Boolean> {
         @Override
-        public Boolean apply(Object object) {
+        public Boolean apply(Void object) {
+            System.out.println("Input: " + object);
             return Boolean.FALSE;
         }
     }
@@ -31,6 +38,7 @@ public class PipelineProcessorTest {
     class Handler3 implements Comparable, Function<Boolean, String> {
         @Override
         public String apply(Boolean object) {
+            System.out.println("Input: " + object);
             return "world";
         }
 
@@ -42,11 +50,13 @@ public class PipelineProcessorTest {
         
     @Test
     public void testSomeLibraryMethod() {
-        
+            
         PipelineProcessor.Builder<String, String> builder2 = PipelineProcessor.<String, String> builder();
         
-        //Object obj = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).handler(new Handler3()).output("hello");
-        Object obj = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build().process(123, int.class);
+        PipelineProcessor processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).outputType(String.class).build();
+        Object objInput = "Hello World";
+        Object obj = processor.input(null).output();
+
         System.out.println("output: " + obj);
     }
 }
