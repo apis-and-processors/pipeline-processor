@@ -7,10 +7,8 @@ package com.github.pipeline.processor.utils;
 
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
 import com.github.pipeline.processor.PipelineHandler;
-import com.github.pipeline.processor.PipelineProcessor;
 import com.github.pipeline.processor.exceptions.CheckTimeTypeMismatchException;
 import com.github.type.utils.ClassType;
-import com.github.type.utils.TypeUtils;
 import com.github.type.utils.exceptions.TypeMismatchException;
 import com.google.common.collect.Maps;
 import java.util.List;
@@ -22,7 +20,7 @@ import java.util.Map;
  */
 public class PipelineUtils {
         
-    public static Map<Integer, ClassType> typeCheckPipeline(List<? extends PipelineHandler> pipeline, Object expectedOutputType) {
+    public static Map<Integer, ClassType> typeCheckPipeline(List<? extends PipelineHandler> pipeline) {
         Map<Integer, ClassType> runtimePipelineChecks = Maps.newHashMap();
         
         PipelineHandler previousHandler = null;
@@ -52,20 +50,6 @@ public class PipelineUtils {
             if (i != lastIndex) {
                 previousClazzType = currentClazzType;
                 previousHandler = currentHandler;
-            } else {
-                if (expectedOutputType != null) {
-                    ClassType outputClazzType = TypeUtils.parseClassType(expectedOutputType);
-                    try {
-                        int index = currentClazzType.subTypeAtIndex(1).compare(outputClazzType);
-                        if (index == 1) {
-                            runtimePipelineChecks.put(index, outputClazzType);
-                        }
-                    } catch (TypeMismatchException tme) {
-                        throw new CheckTimeTypeMismatchException("Handler (" 
-                                + currentHandler.getClass().getName() + ") at index " + i + " " 
-                                + "outputs do not match expected output of PipelineProcessor.", tme);
-                    } 
-                }
             }
         }
         

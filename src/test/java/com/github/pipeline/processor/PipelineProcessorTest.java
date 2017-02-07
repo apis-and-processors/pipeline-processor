@@ -7,8 +7,10 @@ package com.github.pipeline.processor;
 
 import com.github.type.utils.domain.Null;
 import com.google.common.base.Function;
+import com.google.common.reflect.TypeToken;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import org.testng.annotations.Test;
 
@@ -28,19 +30,19 @@ public class PipelineProcessorTest {
         }
     }
     
-    class Handler2 implements Function<Null, Boolean> {
+    class Handler2 implements Function<Null, Optional<Boolean>> {
         @Override
-        public Boolean apply(Null object) {
+        public Optional<Boolean> apply(Null object) {
             System.out.println("Input: " + object);
-            return Boolean.FALSE;
+            return Optional.empty();
         }
     }
         
-    class Handler3 implements Comparable, Function<Boolean, String> {
+    class Handler3 implements Comparable, Function<Optional<Boolean>, Optional<String>> {
         @Override
-        public String apply(Boolean object) {
+        public Optional<String> apply(Optional<Boolean> object) {
             System.out.println("Input: " + object);
-            return "world";
+            return Optional.of("helloWorld");
         }
 
         @Override
@@ -54,9 +56,11 @@ public class PipelineProcessorTest {
             
         PipelineProcessor.Builder<String, String> builder2 = PipelineProcessor.<String, String> builder();
         
-        PipelineProcessor processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).outputType(String.class).build();
-        Object objInput = "Hello World";
-        Object obj = processor.input(objInput).output();
+        
+        Optional<String> fish = Optional.<String>empty();
+        System.out.println(TypeToken.of(fish.getClass().getGenericSuperclass()));
+        PipelineProcessor processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build();
+        Optional<Object> obj = processor.input("bears").output();
 
         System.out.println("output: " + obj);
     }

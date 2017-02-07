@@ -45,15 +45,13 @@ import javax.annotation.Nullable;
 public class PipelineProcessor {
     
     private final List<? extends PipelineHandler> pipeline;
-    private final Class<?> outputType;
     private final Map<Integer, ClassType> runtimePipelineChecks;
 
     private volatile Object initialInput;
             
-    public PipelineProcessor(List<? extends PipelineHandler> pipeline, @Nullable Class<?> outputType) {
+    public PipelineProcessor(List<? extends PipelineHandler> pipeline) {
         this.pipeline = pipeline;
-        this.outputType = outputType;
-        this.runtimePipelineChecks = PipelineUtils.typeCheckPipeline(pipeline, outputType);
+        this.runtimePipelineChecks = PipelineUtils.typeCheckPipeline(pipeline);
     }
     
     public PipelineProcessor input(@Nullable Object initialInput) {
@@ -112,9 +110,13 @@ public class PipelineProcessor {
             if (lastOutput == null && !handle.outputNullable()) {
                 throw new NullNotAllowedException("PipelineHandler (" + handle.id() + ") at index " + i + " does not permit NULL outputs");
             }
-        }        
+        }
         
-        return Optional.ofNullable(lastOutput);
+        if (lastOutput instanceof Optional) {
+            return Optional.class.cast(lastOutput);
+        } else {
+            return Optional.ofNullable(lastOutput);
+        }
     }
     
     public static <T, V> Builder<T, V> builder() {
@@ -125,7 +127,6 @@ public class PipelineProcessor {
     
         private final Logger LOGGER = Logger.getLogger(PipelineProcessor.class.getName());
         private final List<PipelineHandler> pipelineHandlers = new ArrayList<>();
-        private Class<?> outputType = null;
         
         /**
          * Add handler to this pipeline
@@ -185,19 +186,6 @@ public class PipelineProcessor {
         }
         
         /**
-         * The outputType to check against output of pipeline. Useful when the output 
-         * type is an Object but we want to ensure a specific type.
-         * 
-         * @param outputType optional outputType we expect from pipeline. 
-         * @return this Builder.
-         */
-        public Builder outputType(final Class<?> outputType) {
-            checkNotNull(outputType, "pipelineHandler cannot be null");
-            this.outputType = outputType;
-            return this;
-        }
-        
-        /**
          * Build a PipelineProcessor from passed build parameters.
          * 
          * @param <T>
@@ -206,7 +194,7 @@ public class PipelineProcessor {
          */
         public <T, V> PipelineProcessor build() {
             checkArgument(!pipelineHandlers.isEmpty(), "Cannot build processor with no handlers");
-            return new PipelineProcessor(Collections.unmodifiableList(pipelineHandlers), this.outputType);
+            return new PipelineProcessor(Collections.unmodifiableList(pipelineHandlers));
         }
     }
 }
