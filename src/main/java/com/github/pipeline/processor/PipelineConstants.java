@@ -6,7 +6,8 @@
 package com.github.pipeline.processor;
 
 /**
- *
+ * Constants used globally within the PipelineProcessor
+ * 
  * @author cdancy
  */
 public class PipelineConstants {

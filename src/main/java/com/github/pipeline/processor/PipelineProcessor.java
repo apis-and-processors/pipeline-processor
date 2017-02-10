@@ -18,17 +18,18 @@
 package com.github.pipeline.processor;
 
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
-import com.github.pipeline.processor.exceptions.NullNotAllowedException;
-import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.github.pipeline.processor.exceptions.NullNotAllowedException;
+import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
+
 import com.github.pipeline.processor.utils.PipelineUtils;
-import com.github.type.utils.ClassType;
-import com.github.type.utils.ReflectionUtils;
-import com.github.type.utils.TypeUtils;
-import com.github.type.utils.domain.Null;
-import com.github.type.utils.exceptions.TypeMismatchException;
+import com.github.aap.type.utils.ClassType;
+import com.github.aap.type.utils.ReflectionUtils;
+import com.github.aap.type.utils.TypeUtils;
+import com.github.aap.type.utils.domain.Null;
+import com.github.aap.type.utils.exceptions.TypeMismatchException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,27 +40,32 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 /**
- *
+ * PipelineProcessor acts as an assembly line to process functions. The output 
+ * of one function is the input to the next and so on and so forth. The return 
+ * value of this processor is the output of the last function executed.
+ * 
+ * @param <V> optional input value to processor.
+ * @param <R> expected return value of pipeline. Defaults to Object.
  * @author github.
  */
-public class PipelineProcessor {
+public class PipelineProcessor<V, R> {
     
     private final List<? extends PipelineHandler> pipeline;
     private final Map<Integer, ClassType> runtimePipelineChecks;
 
-    private volatile Object initialInput;
+    private volatile V initialInput;
             
     public PipelineProcessor(List<? extends PipelineHandler> pipeline) {
         this.pipeline = pipeline;
-        this.runtimePipelineChecks = PipelineUtils.typeCheckPipeline(pipeline);
+        this.runtimePipelineChecks = PipelineUtils.typeCheckPipeline(pipeline);        
     }
-    
-    public PipelineProcessor input(@Nullable Object initialInput) {
+      
+    public PipelineProcessor input(@Nullable V initialInput) {
         this.initialInput = initialInput;
         return this;
     }
        
-    public Optional<Object> output() {
+    public Optional<R> output() {
 
         Object lastOutput = initialInput;
         for(int i = 0; i < pipeline.size(); i++) {
@@ -85,7 +91,7 @@ public class PipelineProcessor {
                 
                 // ignore Null class as we would have not been able 
                 // to reach this point if they weren't allowed
-                if (!handlerClassType.toString().equals(com.github.type.utils.domain.Null.class.getName())) {
+                if (!handlerClassType.toString().equals(com.github.aap.type.utils.domain.Null.class.getName())) {
                     try {
                         handlerClassType.compare(expectedClassType);
                     } catch (TypeMismatchException tme) {
@@ -115,21 +121,22 @@ public class PipelineProcessor {
         if (lastOutput instanceof Optional) {
             return Optional.class.cast(lastOutput);
         } else {
-            return Optional.ofNullable(lastOutput);
+            return Optional.ofNullable((R)lastOutput);
         }
     }
     
-    public static <T, V> Builder<T, V> builder() {
+    public static <V, R> Builder<V, R> builder() {
         return new Builder();
     }
     
-    public static class Builder<T, V> {
+    public static class Builder<V, R> {
     
         private final Logger LOGGER = Logger.getLogger(PipelineProcessor.class.getName());
         private final List<PipelineHandler> pipelineHandlers = new ArrayList<>();
         
         /**
-         * Add handler to this pipeline
+         * Add handler to this pipeline. pipelineHandler must be an instance of com.google.common.base.Function
+         * or java.util.function.Function.
          * 
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
@@ -149,7 +156,7 @@ public class PipelineProcessor {
         }
 
         /**
-         * Add handler to this pipeline
+         * Add instance of com.google.common.base.Function to this pipeline
          * 
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
@@ -161,7 +168,7 @@ public class PipelineProcessor {
         }
         
         /**
-         * Add handler to this pipeline
+         * Add instance of java.util.function.Function to this pipeline
          * 
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
@@ -173,7 +180,7 @@ public class PipelineProcessor {
         }
         
         /**
-         * Add handler to this pipeline
+         * Add PipelineHandler to this pipeline
          * 
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
@@ -188,13 +195,13 @@ public class PipelineProcessor {
         /**
          * Build a PipelineProcessor from passed build parameters.
          * 
-         * @param <T>
-         * @param <V>
+         * @param <V> optional Typed input value to processor.
+         * @param <R> expected return value of pipeline. Defaults to Object.
          * @return newly created PipelineProcessor.
          */
-        public <T, V> PipelineProcessor build() {
+        public <V, R> PipelineProcessor <V, R> build() {
             checkArgument(!pipelineHandlers.isEmpty(), "Cannot build processor with no handlers");
-            return new PipelineProcessor(Collections.unmodifiableList(pipelineHandlers));
+            return new PipelineProcessor<>(Collections.unmodifiableList(pipelineHandlers));
         }
     }
 }

@@ -6,6 +6,8 @@
 package com.github.pipeline.processor.exceptions;
 
 /**
+ * Throw when a null is either passed in or returned from a given Function
+ * but is not allowed.
  * 
  * @author cdancy
  */

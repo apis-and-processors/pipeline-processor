@@ -5,11 +5,10 @@
  */
 package com.github.pipeline.processor;
 
-import com.github.type.utils.domain.Null;
+import com.github.aap.type.utils.TypeUtils;
+import com.github.aap.type.utils.domain.Null;
 import com.google.common.base.Function;
 import com.google.common.reflect.TypeToken;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.testng.annotations.Test;
@@ -38,11 +37,12 @@ public class PipelineProcessorTest {
         }
     }
         
-    class Handler3 implements Comparable, Function<Optional<Boolean>, Optional<String>> {
+    class Handler3 implements Comparable, Function<Optional<Boolean>, String> {
         @Override
-        public Optional<String> apply(Optional<Boolean> object) {
+        @Nullable
+        public String apply(Optional<Boolean> object) {
             System.out.println("Input: " + object);
-            return Optional.of("helloWorld");
+            return null;
         }
 
         @Override
@@ -59,9 +59,11 @@ public class PipelineProcessorTest {
         
         Optional<String> fish = Optional.<String>empty();
         System.out.println(TypeToken.of(fish.getClass().getGenericSuperclass()));
-        PipelineProcessor processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build();
-        Optional<Object> obj = processor.input("bears").output();
+        PipelineProcessor<String, String> processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build();
+        
+        
+        Optional<String> obj = processor.input("bears").output();
 
-        System.out.println("output: " + obj);
+        System.out.println("output: " + obj.isPresent());
     }
 }
