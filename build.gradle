@@ -1,5 +1,6 @@
 buildscript {
     repositories {
+        mavenLocal()
         jcenter()
         mavenCentral()
     }
@@ -15,6 +16,7 @@ apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.artifactory'
 apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'checkstyle'
+apply plugin: 'pmd'
 apply plugin: 'jacoco'
 
 apply from: "$rootDir/gradle/additional-artifacts.gradle"
@@ -30,7 +32,9 @@ repositories {
 }
 
 dependencies {
-    compile group: "com.github.aap", name: "type-utils", version: "0.0.1-SNAPSHOT", changing: true
+    compile group: "com.github.aap", name: "processor-tools", version: "0.0.1-SNAPSHOT", changing: true
+    compile 'org.reactivestreams:reactive-streams:1.0.0'
+    compile 'com.google.guava:guava:21.0'
     compile 'com.google.code.findbugs:jsr305:3.0.1'
     compile 'net.jodah:failsafe:1.0.3'
     compile 'org.slf4j:slf4j-api:1.7.21'
@@ -57,7 +61,21 @@ checkstyle {
     toolVersion = "6.13"
 }
 
+pmd {
+    ruleSetConfig = resources.text.fromFile(rootProject.file("config/pmd/pmd.xml"))
+    consoleOutput = true
+    ignoreFailures = false
+    ruleSets = []
+}
+
 jacocoTestReport {
+    reports {
+        xml.enabled = true
+        html.enabled = true
+    }
+}
+
+tasks.withType(Pmd) {
     reports {
         xml.enabled = true
         html.enabled = true

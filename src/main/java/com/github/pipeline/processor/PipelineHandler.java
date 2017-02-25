@@ -1,57 +1,63 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package com.github.pipeline.processor;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.github.aap.type.utils.ClassType;
-import com.github.aap.type.utils.TypeUtils;
-import com.google.common.base.Throwables;
+import com.github.aap.processor.tools.TypeUtils;
+import com.github.aap.processor.tools.domain.ClassType;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.function.Function;
 import javax.annotation.Nullable;
-import net.jodah.failsafe.Failsafe;
-import net.jodah.failsafe.RetryPolicy;
 
 /**
- * Represents a single handler within a PipelineProcessor. It's responsible for 
- * executing either an instance of com.google.common.base.Function or java.util.function.Function.
+ * Represents a single handler within a PipelineProcessor. 
  * 
+ * <p>
  * The handler takes in a single input and returns a single output. This may be 
  * the input of some previously executed PipelineHandler and the output in turn may 
  * be serving as the input for the next PipelineHandler.
  * 
  * PipelineHandler's can be optionally re-run by passing in a RetryPolicy. Default is to 
  * execute the handler once and return whatever value was produced.
+ * </p>
  * 
  * @param <V> input value to handler
  * @param <R> return value of handler
  */
 public class PipelineHandler <V, R> {
 
-    private static final Logger LOGGER = Logger.getLogger(PipelineHandler.class.getName());
+    //private static final Logger LOGGER = Logger.getLogger(PipelineHandler.class.getName());
 
-    private static final RetryPolicy DEFAULT_RETRY_POLICY = new RetryPolicy().withMaxRetries(0).abortOn(ClassCastException.class);
+    //private static final RetryPolicy DEFAULT_RETRY_POLICY = new RetryPolicy().withMaxRetries(0).abortOn(ClassCastException.class);
     
-    private static final String RETRY_ATTEMPT_MESSAGE = "Execution attempt failed due to: {0}";
-    private static final String RETRY_FAILED_MESSAGE = "Execution failed due to: {0}";
-    private static final String RETRY_RUN_MESSAGE = "Execution attempt {0} on {1}";
+    //private static final String RETRY_ATTEMPT_MESSAGE = "Execution attempt failed due to: {0}";
+    //private static final String RETRY_FAILED_MESSAGE = "Execution failed due to: {0}";
+    //private static final String RETRY_RUN_MESSAGE = "Execution attempt {0} on {1}";
     
-    private final Object function;
-    private final RetryPolicy retryPolicy;
+    private final Function function;
     private final boolean inputNullable;
     private final boolean outputNullable;
     private final ClassType classType;
 
-    private PipelineHandler(Object function, @Nullable RetryPolicy retryPolicy, boolean inputNullable, boolean outputNullable) {
+    private PipelineHandler(final Function function, final boolean inputNullable, final boolean outputNullable) {
         this.function = function;
-        this.retryPolicy = retryPolicy != null ? retryPolicy : DEFAULT_RETRY_POLICY;
         this.inputNullable = inputNullable;
         this.outputNullable = outputNullable;
         this.classType = TypeUtils.parseClassType(function);
@@ -94,6 +100,7 @@ public class PipelineHandler <V, R> {
         return function.getClass().getName();
     }
     
+    /*
     public R process(V input) {
         
         AtomicReference<R> responseReference = new AtomicReference<>();
@@ -113,26 +120,17 @@ public class PipelineHandler <V, R> {
                     java.util.function.Function worker = (java.util.function.Function)function;
                     responseReference.set((R) worker.apply(input));
                 } else {
-                    throw new ClassCastException("Cannot cast '" + function + "' to either an instance of com.google.common.base.Function or java.util.function.Function");
+                    throw new ClassCastException("Cannot cast '" + function 
+    + "' to either an instance of com.google.common.base.Function or java.util.function.Function");
                 }                
             });
                 
         return responseReference.get();
     }
+    */
     
-    /**
-     * Create new instance of PipelineHandler backed by com.google.common.base.Function 
-     * 
-     * @param <V> input value to function
-     * @param <R> return value of function
-     * @param function instance of com.google.common.base.Function
-     * @param retryPolicy optional RetryPolicy to re-run function upon failure.
-     * @return newly created PipelineHandler
-     */
-    public static <V, R> PipelineHandler newInstance(com.google.common.base.Function<V, R> function, @Nullable RetryPolicy retryPolicy) {
-        checkNotNull(function, "function cannot be null");
-        boolean [] pair = inputOutputNullables(function);
-        return new PipelineHandler(function, retryPolicy, pair[0], pair[1]);
+    public R process(final V input) {
+        return (R) function.apply(input);
     }
     
     /**
@@ -141,31 +139,30 @@ public class PipelineHandler <V, R> {
      * @param <V> input value to function
      * @param <R> return value of function
      * @param function instance of java.util.function.Function
-     * @param retryPolicy optional RetryPolicy to re-run function upon failure.
      * @return newly created PipelineHandler
      */
-    public static <V, R> PipelineHandler newInstance(java.util.function.Function<V, R> function, @Nullable RetryPolicy retryPolicy) {
+    public static <V, R> PipelineHandler newInstance(final Function<V, R> function) {
         checkNotNull(function, "function cannot be null");
-        boolean [] pair = inputOutputNullables(function);
-        return new PipelineHandler(function, retryPolicy, pair[0], pair[1]);
+        final boolean [] pair = inputOutputNullables(function);
+        return new PipelineHandler(function, pair[0], pair[1]);
     }
     
     /**
      * Helper method to determine if a given function accepts null inputs and is 
      * permitted to return null outputs.
      * 
-     * @param function instance of either com.google.common.base.Function or java.util.function.Function
+     * @param function instance of java.util.function.Function
      * @return boolean array of exactly size 2 where index 0 denotes if input is nullable and index 1 
      *         denotes if output is nullable,
      */
-    private static boolean[] inputOutputNullables(Object function) {
+    private static boolean[] inputOutputNullables(final Function function) {
         try {
             
-            Method applyMethod = function.getClass().getDeclaredMethod("apply", Object.class);
-            boolean outputNullable = applyMethod.getDeclaredAnnotation(Nullable.class) != null;
+            final Method applyMethod = function.getClass().getDeclaredMethod("apply", Object.class);
+            final boolean outputNullable = applyMethod.getDeclaredAnnotation(Nullable.class) != null;
             boolean inputNullable = false;
             
-            Annotation[] parameterAnnotations = applyMethod.getParameterAnnotations()[0];
+            final Annotation[] parameterAnnotations = applyMethod.getParameterAnnotations()[0];
             for (int i = 0; i < parameterAnnotations.length; i++) {
                 if (parameterAnnotations[i].annotationType().equals(Nullable.class)) {
                     inputNullable = true;
@@ -173,10 +170,10 @@ public class PipelineHandler <V, R> {
                 }
             }
             
-            boolean[] pair = {inputNullable, outputNullable};
+            final boolean[] pair = {inputNullable, outputNullable};
             return pair;
         } catch (NoSuchMethodException | SecurityException ex) {
-            throw Throwables.propagate(ex);
+            throw new RuntimeException(ex);
         }
     }
 }

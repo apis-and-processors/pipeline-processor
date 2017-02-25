@@ -17,27 +17,31 @@
 
 package com.github.pipeline.processor;
 
+import static com.github.pipeline.processor.PipelineConstants.INDEX_STRING;
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.github.aap.processor.tools.ReflectionUtils;
+import com.github.aap.processor.tools.TypeUtils;
+import com.github.aap.processor.tools.domain.ClassType;
+import com.github.aap.processor.tools.domain.Null;
+import com.github.aap.processor.tools.exceptions.TypeMismatchException;
 import com.github.pipeline.processor.exceptions.NullNotAllowedException;
 import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
-
 import com.github.pipeline.processor.utils.PipelineUtils;
-import com.github.aap.type.utils.ClassType;
-import com.github.aap.type.utils.ReflectionUtils;
-import com.github.aap.type.utils.TypeUtils;
-import com.github.aap.type.utils.domain.Null;
-import com.github.aap.type.utils.exceptions.TypeMismatchException;
-import java.util.ArrayList;
+import com.google.common.collect.ImmutableList;
+
+import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import org.reactivestreams.Subscriber;
 
 /**
  * PipelineProcessor acts as an assembly line to process functions. The output 
@@ -51,32 +55,61 @@ import javax.annotation.Nullable;
 public class PipelineProcessor<V, R> {
     
     private final List<? extends PipelineHandler> pipeline;
+    private final List<Subscriber> subscribers;
     private final Map<Integer, ClassType> runtimePipelineChecks;
 
     private volatile V initialInput;
             
-    public PipelineProcessor(List<? extends PipelineHandler> pipeline) {
+    /**
+     * Create PipelineProcessor from pre-built pipeline with optional Subscribers.
+     * 
+     * @param pipeline pipeline to process
+     * @param subscribers optional subscribers to get callback notifications
+     */
+    private PipelineProcessor(final List<? extends PipelineHandler> pipeline, final List<Subscriber> subscribers) {
         this.pipeline = pipeline;
+        this.subscribers = ImmutableList.copyOf(subscribers);
         this.runtimePipelineChecks = PipelineUtils.typeCheckPipeline(pipeline);        
     }
-      
-    public PipelineProcessor input(@Nullable V initialInput) {
+
+    /**
+     * Optionally provide some input into the first handler of this processor.
+     * 
+     * @param initialInput optional input to pass to first handler.
+     * @return this PipelineProcessor.
+     */
+    public PipelineProcessor input(@Nullable final V initialInput) {
         this.initialInput = initialInput;
         return this;
     }
-       
+
+    /**
+     * Get list of Subscribers.
+     * 
+     * @return list of Subscribers
+     */
+    public List<Subscriber> subscribers() {
+        return this.subscribers;
+    }
+    
+    /**
+     * Get the output of this PipelineProcessor. This is analogous to starting 
+     * the pipeline.
+     * 
+     * @return Optional which encapsulates the potentially NULL value.
+     */
     public Optional<R> output() {
 
         Object lastOutput = initialInput;
-        for(int i = 0; i < pipeline.size(); i++) {
-            PipelineHandler handle = pipeline.get(i);
+        for (int i = 0; i < pipeline.size(); i++) {
+            final PipelineHandler handle = pipeline.get(i);
                         
             // ensure null inputs are allowed if applicable
             if (lastOutput == null && !handle.inputNullable()) {
-                ClassType inputType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
+                final ClassType inputType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
                 if (!(inputType.toString().equals(Void.class.getName()) 
                         || inputType.toString().equals(Null.class.getName()))) {
-                    throw new NullNotAllowedException("PipelineHandler (" + handle.id() + ") at index " + i + " does not permit NULL inputs");
+                    throw new NullNotAllowedException("PipelineHandler (" + handle.id() + INDEX_STRING + i + " does not permit NULL inputs");
                 }                
             }
             
@@ -87,11 +120,11 @@ public class PipelineProcessor<V, R> {
             }
             
             if (expectedClassType != null) {
-                ClassType handlerClassType = TypeUtils.parseClassType(lastOutput);
+                final ClassType handlerClassType = TypeUtils.parseClassType(lastOutput);
                 
                 // ignore Null class as we would have not been able 
                 // to reach this point if they weren't allowed
-                if (!handlerClassType.toString().equals(com.github.aap.type.utils.domain.Null.class.getName())) {
+                if (!handlerClassType.toString().equals(Null.class.getName())) {
                     try {
                         handlerClassType.compare(expectedClassType);
                     } catch (TypeMismatchException tme) {
@@ -99,12 +132,12 @@ public class PipelineProcessor<V, R> {
                         if (i == 0) {
                             message = "Initial input to " + PipelineProcessor.class.getSimpleName() + " does ";
                         } else {
-                            int index = i - 1;
-                            message = "Handler (" + pipeline.get(index).id() + ") at index " + index + " outputs do ";
+                            final int index = i - 1;
+                            message = "Handler (" + pipeline.get(index).id() + INDEX_STRING + index + " outputs do ";
                         }
                         throw new ProcessTimeTypeMismatchException(message 
                                 + "not match Handler (" 
-                                + handle.id() + ") at index " + i + " inputs.", tme);
+                                + handle.id() + INDEX_STRING + i + " inputs.", tme);
                     } 
                 }
             }
@@ -114,7 +147,7 @@ public class PipelineProcessor<V, R> {
             
             // ensure null outputs are allowed if applicable
             if (lastOutput == null && !handle.outputNullable()) {
-                throw new NullNotAllowedException("PipelineHandler (" + handle.id() + ") at index " + i + " does not permit NULL outputs");
+                throw new NullNotAllowedException("PipelineHandler (" + handle.id() + INDEX_STRING + i + " does not permit NULL outputs");
             }
         }
         
@@ -125,46 +158,25 @@ public class PipelineProcessor<V, R> {
         }
     }
     
-    public static <V, R> Builder<V, R> builder() {
+    public static <T, V> Builder<T, V> builder() {
         return new Builder();
     }
     
     public static class Builder<V, R> {
     
-        private final Logger LOGGER = Logger.getLogger(PipelineProcessor.class.getName());
-        private final List<PipelineHandler> pipelineHandlers = new ArrayList<>();
+        private final Logger logger = Logger.getLogger(PipelineProcessor.class.getName());
+        private final List<PipelineHandler> pipelineHandlers = Lists.newArrayList();
+        private final List<Subscriber> subscribers = Lists.newArrayList();
         
         /**
-         * Add handler to this pipeline. pipelineHandler must be an instance of com.google.common.base.Function
-         * or java.util.function.Function.
+         * Add class of java.util.function.Function to this pipeline
          * 
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
          */
-        public Builder handler(Class pipelineHandler) {
+        public Builder handler(final Class<? extends Function> pipelineHandler) {
             checkNotNull(pipelineHandler, "pipelineHandler cannot be null");
-            
-            if (com.google.common.base.Function.class.isAssignableFrom(pipelineHandler)) {
-                com.google.common.base.Function function = (com.google.common.base.Function)ReflectionUtils.newInstance(pipelineHandler);
-                return handler(function);
-            } else if (java.util.function.Function.class.isAssignableFrom(pipelineHandler)) {
-                java.util.function.Function function = (java.util.function.Function)ReflectionUtils.newInstance(pipelineHandler);
-                return handler(function);
-            } else {
-                throw new ClassCastException("pipelineHandler must be either an instance of com.google.common.base.Function or java.util.function.Function");
-            }
-        }
-
-        /**
-         * Add instance of com.google.common.base.Function to this pipeline
-         * 
-         * @param pipelineHandler handler to append to the end of this pipeline.
-         * @return this Builder.
-         */
-        public Builder handler(final com.google.common.base.Function<?, ?> pipelineHandler) {
-            checkNotNull(pipelineHandler, "pipelineHandler cannot be null");
-            PipelineHandler handler = PipelineHandler.newInstance(pipelineHandler, null);
-            return handler(handler);
+            return handler(ReflectionUtils.newInstance(pipelineHandler));
         }
         
         /**
@@ -173,14 +185,14 @@ public class PipelineProcessor<V, R> {
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
          */
-        public Builder handler(final java.util.function.Function<?, ?> pipelineHandler) {
+        public Builder handler(final Function<?, ?> pipelineHandler) {
             checkNotNull(pipelineHandler, "pipelineHandler cannot be null");
-            PipelineHandler handler = PipelineHandler.newInstance(pipelineHandler, null);
+            final PipelineHandler handler = PipelineHandler.newInstance(pipelineHandler);
             return handler(handler);
         }
         
         /**
-         * Add PipelineHandler to this pipeline
+         * Add PipelineHandler to this pipeline.
          * 
          * @param pipelineHandler handler to append to the end of this pipeline.
          * @return this Builder.
@@ -188,7 +200,18 @@ public class PipelineProcessor<V, R> {
         public Builder handler(final PipelineHandler pipelineHandler) {
             checkNotNull(pipelineHandler, "pipelineHandler cannot be null");
             pipelineHandlers.add(pipelineHandler);
-            LOGGER.log(Level.CONFIG, "Handler '{0}' added to pipeline", pipelineHandler.getClass().getName());
+            logger.log(Level.CONFIG, "Handler '{0}' added to pipeline", pipelineHandler.getClass().getName());
+            return this;
+        }
+        
+        /**
+         * Add subscriber to this handler to be notified of updates.
+         * 
+         * @param subscriber the Subscriber to add to this handler
+         * @return this Builder.
+         */
+        public Builder subscribe(final Subscriber subscriber) {
+            subscribers.add(checkNotNull(subscriber, "subscriber cannot be null"));
             return this;
         }
         
@@ -201,7 +224,7 @@ public class PipelineProcessor<V, R> {
          */
         public <V, R> PipelineProcessor <V, R> build() {
             checkArgument(!pipelineHandlers.isEmpty(), "Cannot build processor with no handlers");
-            return new PipelineProcessor<>(Collections.unmodifiableList(pipelineHandlers));
+            return new PipelineProcessor<>(Collections.unmodifiableList(pipelineHandlers), subscribers);
         }
     }
 }

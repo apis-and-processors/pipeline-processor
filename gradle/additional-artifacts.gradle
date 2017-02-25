@@ -1,5 +1,6 @@
 shadowJar {
-  mergeServiceFiles()
+    mergeServiceFiles()
+    relocate 'com.google', 'com.github.aap.type.utils.shaded.com.google'
 }
 
 task sourcesJar(type: Jar) {
@@ -10,4 +11,9 @@ task sourcesJar(type: Jar) {
 task javadocJar(type: Jar, dependsOn: javadoc) {
     classifier 'javadoc'
     from javadoc.destinationDir
+}
+
+task testsJar(type: Jar) {
+    classifier = 'tests'
+    from sourceSets.test.output
 }
