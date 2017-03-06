@@ -18,8 +18,8 @@
 package com.github.pipeline.processor;
 
 import com.github.aap.processor.tools.domain.Null;
-import com.google.common.reflect.TypeToken;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.testng.annotations.Test;
@@ -31,12 +31,14 @@ import org.testng.annotations.Test;
  */
 public class PipelineProcessorTest {
    
+    private static final AtomicInteger bears = new AtomicInteger(0);
+    
     class Handler1 implements Function<String, Object> {
         
         @Override
         @Nullable
         public Object apply(final String object) {
-            System.out.println("Input: " + object);
+            System.out.println("Input1: " + object);
             return null;
         }
     }
@@ -44,7 +46,15 @@ public class PipelineProcessorTest {
     class Handler2 implements Function<Null, Optional<Boolean>> {
         @Override
         public Optional<Boolean> apply(final Null object) {
-            System.out.println("Input: " + object);
+
+            if (bears.get() == 0) {
+                bears.incrementAndGet();
+                System.out.println("inside failure pop");
+                throw new RuntimeException("FAILURE FROM BEARS");
+            } else {
+                System.out.println("we can keep going");
+            }
+            System.out.println("Input2: " + object);
             return Optional.empty();
         }
     }
@@ -53,7 +63,7 @@ public class PipelineProcessorTest {
         @Override
         @Nullable
         public String apply(final Optional<Boolean> object) {
-            System.out.println("Input: " + object);
+            System.out.println("Input3: " + object);
             return null;
         }
 
@@ -69,12 +79,12 @@ public class PipelineProcessorTest {
         final PipelineProcessor.Builder<String, String> builder2 = PipelineProcessor.builder();
         
         
-        final Optional<String> fish = Optional.<String>empty();
-        System.out.println(TypeToken.of(fish.getClass().getGenericSuperclass()));
+        //final Optional<String> fish = Optional.<String>empty();
+        //System.out.println(TypeToken.of(fish.getClass().getGenericSuperclass()));
         final PipelineProcessor<String, String> processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build();
         
         
-        final Optional<String> obj = processor.input("bears").output();
+        final Optional<String> obj = processor.output("bears");
 
         System.out.println("output: " + obj.isPresent());
     }

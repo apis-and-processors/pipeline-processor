@@ -42,14 +42,6 @@ import javax.annotation.Nullable;
  * @param <R> return value of handler
  */
 public class PipelineHandler <V, R> {
-
-    //private static final Logger LOGGER = Logger.getLogger(PipelineHandler.class.getName());
-
-    //private static final RetryPolicy DEFAULT_RETRY_POLICY = new RetryPolicy().withMaxRetries(0).abortOn(ClassCastException.class);
-    
-    //private static final String RETRY_ATTEMPT_MESSAGE = "Execution attempt failed due to: {0}";
-    //private static final String RETRY_FAILED_MESSAGE = "Execution failed due to: {0}";
-    //private static final String RETRY_RUN_MESSAGE = "Execution attempt {0} on {1}";
     
     private final Function function;
     private final boolean inputNullable;
@@ -92,42 +84,13 @@ public class PipelineHandler <V, R> {
     }
     
     /**
-     * The implementing class name of the backing com.google.common.base.Function or java.util.function.Function.
+     * The implementing class name of the backing java.util.function.Function.
      * 
      * @return id of this handler. Not guaranteed to be unique.
      */
     public String id() {
         return function.getClass().getName();
     }
-    
-    /*
-    public R process(V input) {
-        
-        AtomicReference<R> responseReference = new AtomicReference<>();
-        
-        Failsafe.with(retryPolicy)
-            .onFailedAttempt(attempt -> LOGGER.log(Level.WARNING, RETRY_ATTEMPT_MESSAGE, attempt.getMessage()))
-            .onFailure(failure -> LOGGER.log(Level.SEVERE, RETRY_FAILED_MESSAGE, failure.getMessage()))
-            .run((ctx) -> { 
-                
-                Object [] loggerParams = {ctx.getExecutions() + 1, function.toString()};
-                LOGGER.log(Level.FINE, RETRY_RUN_MESSAGE, loggerParams);
-                
-                if (function instanceof com.google.common.base.Function) {
-                    com.google.common.base.Function worker = (com.google.common.base.Function)function;
-                    responseReference.set((R) worker.apply(input));
-                } else if (function instanceof java.util.function.Function) {
-                    java.util.function.Function worker = (java.util.function.Function)function;
-                    responseReference.set((R) worker.apply(input));
-                } else {
-                    throw new ClassCastException("Cannot cast '" + function 
-    + "' to either an instance of com.google.common.base.Function or java.util.function.Function");
-                }                
-            });
-                
-        return responseReference.get();
-    }
-    */
     
     public R process(final V input) {
         return (R) function.apply(input);

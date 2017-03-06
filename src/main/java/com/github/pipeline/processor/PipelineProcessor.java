@@ -37,10 +37,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import net.jodah.failsafe.Failsafe;
+import net.jodah.failsafe.RetryPolicy;
 import org.reactivestreams.Subscriber;
 
 /**
@@ -54,11 +58,17 @@ import org.reactivestreams.Subscriber;
  */
 public class PipelineProcessor<V, R> {
     
+    private static final Logger LOGGER = Logger.getLogger(PipelineProcessor.class.getName());
+    private static final RetryPolicy DEFAULT_RETRY_POLICY = new RetryPolicy().withMaxRetries(5);
+    
+    private static final String RETRY_ATTEMPT_MESSAGE = "Execution attempt failed due to: {0}";
+    private static final String RETRY_FAILED_MESSAGE = "Execution failed due to: {0}";
+    private static final String RETRY_RUN_MESSAGE = "Execution attempt on {0}";
+    
     private final List<? extends PipelineHandler> pipeline;
     private final List<Subscriber> subscribers;
+    private final RetryPolicy retryPolicy;
     private final Map<Integer, ClassType> runtimePipelineChecks;
-
-    private volatile V initialInput;
             
     /**
      * Create PipelineProcessor from pre-built pipeline with optional Subscribers.
@@ -66,21 +76,14 @@ public class PipelineProcessor<V, R> {
      * @param pipeline pipeline to process
      * @param subscribers optional subscribers to get callback notifications
      */
-    private PipelineProcessor(final List<? extends PipelineHandler> pipeline, final List<Subscriber> subscribers) {
+    private PipelineProcessor(final List<? extends PipelineHandler> pipeline, final List<Subscriber> subscribers, final RetryPolicy retryPolicy) {
+        
         this.pipeline = pipeline;
         this.subscribers = ImmutableList.copyOf(subscribers);
+        this.retryPolicy = (retryPolicy != null 
+                ? retryPolicy
+                : DEFAULT_RETRY_POLICY).abortOn(NullNotAllowedException.class, ProcessTimeTypeMismatchException.class);
         this.runtimePipelineChecks = PipelineUtils.typeCheckPipeline(pipeline);        
-    }
-
-    /**
-     * Optionally provide some input into the first handler of this processor.
-     * 
-     * @param initialInput optional input to pass to first handler.
-     * @return this PipelineProcessor.
-     */
-    public PipelineProcessor input(@Nullable final V initialInput) {
-        this.initialInput = initialInput;
-        return this;
     }
 
     /**
@@ -99,62 +102,95 @@ public class PipelineProcessor<V, R> {
      * @return Optional which encapsulates the potentially NULL value.
      */
     public Optional<R> output() {
+        return output(null);
+    }
+    
+    /**
+     * Get the output of this PipelineProcessor giving it an initial input. 
+     * This is analogous to starting the pipeline.
+     * 
+     * @param input optional initial input into PipelineProcessor.
+     * @return Optional which encapsulates the potentially NULL value.
+     */
+    public Optional<R> output(@Nullable final V input) {
 
-        Object lastOutput = initialInput;
-        for (int i = 0; i < pipeline.size(); i++) {
-            final PipelineHandler handle = pipeline.get(i);
-                        
-            // ensure null inputs are allowed if applicable
-            if (lastOutput == null && !handle.inputNullable()) {
-                final ClassType inputType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
-                if (!(inputType.toString().equals(Void.class.getName()) 
-                        || inputType.toString().equals(Null.class.getName()))) {
-                    throw new NullNotAllowedException("PipelineHandler (" + handle.id() + INDEX_STRING + i + " does not permit NULL inputs");
-                }                
-            }
-            
-            // ensure runtime check passes
-            ClassType expectedClassType = runtimePipelineChecks.get(i);
-            if (expectedClassType == null && i == 0) {
-                expectedClassType = pipeline.get(0).classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
-            }
-            
-            if (expectedClassType != null) {
-                final ClassType handlerClassType = TypeUtils.parseClassType(lastOutput);
-                
-                // ignore Null class as we would have not been able 
-                // to reach this point if they weren't allowed
-                if (!handlerClassType.toString().equals(Null.class.getName())) {
-                    try {
-                        handlerClassType.compare(expectedClassType);
-                    } catch (TypeMismatchException tme) {
-                        String message;
-                        if (i == 0) {
-                            message = "Initial input to " + PipelineProcessor.class.getSimpleName() + " does ";
-                        } else {
-                            final int index = i - 1;
-                            message = "Handler (" + pipeline.get(index).id() + INDEX_STRING + index + " outputs do ";
-                        }
-                        throw new ProcessTimeTypeMismatchException(message 
-                                + "not match Handler (" 
-                                + handle.id() + INDEX_STRING + i + " inputs.", tme);
-                    } 
-                }
-            }
-                    
-            // process function
-            lastOutput = handle.process(lastOutput);
-            
-            // ensure null outputs are allowed if applicable
-            if (lastOutput == null && !handle.outputNullable()) {
-                throw new NullNotAllowedException("PipelineHandler (" + handle.id() + INDEX_STRING + i + " does not permit NULL outputs");
-            }
-        }
+        // holds the eventual response of this execution
+        final AtomicReference<Object> responseReference = new AtomicReference<>(input);
         
-        if (lastOutput instanceof Optional) {
-            return Optional.class.cast(lastOutput);
+        // holds the starting point of next handler to execute
+        final AtomicInteger indexReference = new AtomicInteger(0);
+
+        Failsafe.with(retryPolicy)
+                .onFailedAttempt(failure ->  {
+                    indexReference.decrementAndGet(); 
+                    LOGGER.log(Level.WARNING, RETRY_ATTEMPT_MESSAGE, failure.getMessage()); 
+                })
+                .onFailure(failure -> LOGGER.log(Level.SEVERE, RETRY_FAILED_MESSAGE, failure.getMessage()))
+                .run(ctx -> { 
+
+                    for (int i = indexReference.get(); i < pipeline.size(); i++) {
+                        indexReference.incrementAndGet();
+
+                        final PipelineHandler handle = pipeline.get(i);
+                        LOGGER.log(Level.INFO, RETRY_RUN_MESSAGE, handle.id());
+
+                        // ensure null inputs are allowed if applicable
+                        if (responseReference.get() == null && !handle.inputNullable()) {
+                            final ClassType inputType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
+                            if (!(inputType.toString().equals(Void.class.getName()) 
+                                    || inputType.toString().equals(Null.class.getName()))) {
+                                throw new NullNotAllowedException("PipelineHandler (" 
+                                        + handle.id() + INDEX_STRING + i + " does not permit NULL inputs");
+                            }                
+                        }
+
+                        // ensure runtime check passes
+                        ClassType expectedClassType = runtimePipelineChecks.get(i);
+                        if (expectedClassType == null && i == 0) {
+                            expectedClassType = pipeline.get(0).classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
+                        }
+
+                        if (expectedClassType != null) {
+                            final ClassType handlerClassType = TypeUtils.parseClassType(responseReference.get());
+
+                            // ignore Null class as we would have not been able 
+                            // to reach this point if they weren't allowed
+                            if (!handlerClassType.toString().equals(Null.class.getName())) {
+                                try {
+                                    handlerClassType.compare(expectedClassType);
+                                } catch (TypeMismatchException tme) {
+                                    String message;
+                                    if (i == 0) {
+                                        message = "Initial input to " + PipelineProcessor.class.getSimpleName() + " does ";
+                                    } else {
+                                        final int index = i - 1;
+                                        message = "Handler (" + pipeline.get(index).id() + INDEX_STRING + index + " outputs do ";
+                                    }
+                                    throw new ProcessTimeTypeMismatchException(message 
+                                            + "not match Handler (" 
+                                            + handle.id() + INDEX_STRING + i + " inputs.", tme);
+                                } 
+                            }
+                        }
+
+                        // process function
+                        final Object handlerOutput = handle.process(responseReference.get());
+
+                        // ensure null outputs are allowed if applicable
+                        if (handlerOutput == null && !handle.outputNullable()) {
+                            throw new NullNotAllowedException("PipelineHandler (" + handle.id() + INDEX_STRING + i + " does not permit NULL outputs");
+                        } else {
+                            responseReference.set(handlerOutput);
+                        }
+                    }
+                });
+        
+        // it's possible the output itself is an Optional so check for that
+        final Object response = responseReference.get();
+        if (response != null && response instanceof Optional) {
+            return Optional.class.cast(response);
         } else {
-            return Optional.ofNullable((R)lastOutput);
+            return Optional.ofNullable((R)response);
         }
     }
     
@@ -167,6 +203,7 @@ public class PipelineProcessor<V, R> {
         private final Logger logger = Logger.getLogger(PipelineProcessor.class.getName());
         private final List<PipelineHandler> pipelineHandlers = Lists.newArrayList();
         private final List<Subscriber> subscribers = Lists.newArrayList();
+        private RetryPolicy retryPolicy;
         
         /**
          * Add class of java.util.function.Function to this pipeline
@@ -216,6 +253,17 @@ public class PipelineProcessor<V, R> {
         }
         
         /**
+         * Add a RetryPolicy to this PipelineProcessor
+         * 
+         * @param retryPolicy the RetryPolicy to add to this PipelineProcessor
+         * @return this Builder.
+         */
+        public Builder subscribe(final RetryPolicy retryPolicy) {
+            this.retryPolicy = checkNotNull(retryPolicy, "retryPolicy cannot be null");
+            return this;
+        }
+        
+        /**
          * Build a PipelineProcessor from passed build parameters.
          * 
          * @param <V> optional Typed input value to processor.
@@ -224,7 +272,7 @@ public class PipelineProcessor<V, R> {
          */
         public <V, R> PipelineProcessor <V, R> build() {
             checkArgument(!pipelineHandlers.isEmpty(), "Cannot build processor with no handlers");
-            return new PipelineProcessor<>(Collections.unmodifiableList(pipelineHandlers), subscribers);
+            return new PipelineProcessor<>(Collections.unmodifiableList(pipelineHandlers), subscribers, this.retryPolicy);
         }
     }
 }
