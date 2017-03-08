@@ -36,7 +36,6 @@ import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -101,7 +100,7 @@ public class PipelineProcessor<V, R> {
      * 
      * @return Optional which encapsulates the potentially NULL value.
      */
-    public Optional<R> output() {
+    public R output() {
         return output(null);
     }
     
@@ -112,7 +111,7 @@ public class PipelineProcessor<V, R> {
      * @param input optional initial input into PipelineProcessor.
      * @return Optional which encapsulates the potentially NULL value.
      */
-    public Optional<R> output(@Nullable final V input) {
+    public R output(@Nullable final V input) {
 
         // holds the eventual response of this execution
         final AtomicReference<Object> responseReference = new AtomicReference<>(input);
@@ -185,20 +184,14 @@ public class PipelineProcessor<V, R> {
                     }
                 });
         
-        // it's possible the output itself is an Optional so check for that
-        final Object response = responseReference.get();
-        if (response != null && response instanceof Optional) {
-            return Optional.class.cast(response);
-        } else {
-            return Optional.ofNullable((R)response);
-        }
+        return (R) responseReference.get();
     }
     
-    public static <T, V> Builder<T, V> builder() {
+    public static Builder builder() {
         return new Builder();
     }
     
-    public static class Builder<V, R> {
+    public static class Builder {
     
         private final Logger logger = Logger.getLogger(PipelineProcessor.class.getName());
         private final List<PipelineHandler> pipelineHandlers = Lists.newArrayList();
@@ -266,11 +259,9 @@ public class PipelineProcessor<V, R> {
         /**
          * Build a PipelineProcessor from passed build parameters.
          * 
-         * @param <V> optional Typed input value to processor.
-         * @param <R> expected return value of pipeline. Defaults to Object.
          * @return newly created PipelineProcessor.
          */
-        public <V, R> PipelineProcessor <V, R> build() {
+        public PipelineProcessor build() {
             checkArgument(!pipelineHandlers.isEmpty(), "Cannot build processor with no handlers");
             return new PipelineProcessor<>(Collections.unmodifiableList(pipelineHandlers), subscribers, this.retryPolicy);
         }

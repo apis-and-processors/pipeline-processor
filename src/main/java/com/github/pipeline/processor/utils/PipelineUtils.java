@@ -19,6 +19,8 @@ package com.github.pipeline.processor.utils;
 
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.github.aap.processor.tools.domain.ClassType;
 import com.github.aap.processor.tools.exceptions.TypeMismatchException;
 import com.github.pipeline.processor.PipelineHandler;
@@ -45,13 +47,25 @@ public class PipelineUtils {
      *         successfully be matched.
      */
     public static Map<Integer, ClassType> typeCheckPipeline(final List<? extends PipelineHandler> pipeline) {
+        checkNotNull(pipeline, "Cannot pass null pipeline");
+        
+        // if no pipeline handlers then return empty map.
         final Map<Integer, ClassType> runtimePipelineChecks = new HashMap<>();
+        if (pipeline.isEmpty()) {
+            return runtimePipelineChecks;
+        }
         
         PipelineHandler previousHandler = null;
         ClassType previousClazzType = null;
         final int lastIndex = pipeline.size() - 1;
         for (int i = 0; i < pipeline.size(); i++) {
             final PipelineHandler currentHandler = pipeline.get(i);
+            
+            // nulls not allowed in pipeline
+            if (currentHandler == null) {
+                throw new NullPointerException("NULL PipelineHandler at index " + i);
+            }
+            
             if (previousHandler == null) {
                 previousHandler = currentHandler;
                 previousClazzType = previousHandler.classType().firstSubTypeMatching(FUNCTION_REGEX); 

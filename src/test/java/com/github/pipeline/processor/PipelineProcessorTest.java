@@ -18,6 +18,7 @@
 package com.github.pipeline.processor;
 
 import com.github.aap.processor.tools.domain.Null;
+import com.google.common.reflect.TypeToken;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -64,7 +65,7 @@ public class PipelineProcessorTest {
         @Nullable
         public String apply(final Optional<Boolean> object) {
             System.out.println("Input3: " + object);
-            return null;
+            return "123";
         }
 
         @Override
@@ -76,16 +77,17 @@ public class PipelineProcessorTest {
     @Test
     public void testSomeLibraryMethod() {
             
-        final PipelineProcessor.Builder<String, String> builder2 = PipelineProcessor.builder();
+        final PipelineProcessor.Builder builder2 = PipelineProcessor.builder();
         
         
+        System.out.println("Found: " + TypeToken.of(builder2.getClass()));
         //final Optional<String> fish = Optional.<String>empty();
         //System.out.println(TypeToken.of(fish.getClass().getGenericSuperclass()));
-        final PipelineProcessor<String, String> processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build();
+        final PipelineProcessor processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build();
         
         
-        final Optional<String> obj = processor.output("bears");
+        final Object obj = processor.output("bears");
 
-        System.out.println("output: " + obj.isPresent());
+        System.out.println("output: " + obj);
     }
 }
