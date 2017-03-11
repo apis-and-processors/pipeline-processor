@@ -17,6 +17,7 @@
 
 package com.github.pipeline.processor;
 
+import com.github.aap.processor.tools.TypeUtils;
 import com.github.aap.processor.tools.domain.Null;
 import com.google.common.reflect.TypeToken;
 import java.util.Optional;
@@ -26,7 +27,7 @@ import javax.annotation.Nullable;
 import org.testng.annotations.Test;
 
 /**
- * Tests for invoking PipelineProcessor.
+ * Tests for invoking AbstractPipelineProcessor.
  * 
  * @author cdancy
  */
@@ -86,7 +87,7 @@ public class PipelineProcessorTest {
         final PipelineProcessor processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build();
         
         
-        final Object obj = processor.output("bears");
+        final Object obj = processor.output("bears: " + TypeUtils.parseClassType(processor));
 
         System.out.println("output: " + obj);
     }
