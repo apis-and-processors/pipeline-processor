@@ -17,78 +17,99 @@
 
 package com.github.pipeline.processor;
 
-import com.github.aap.processor.tools.TypeUtils;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.github.aap.processor.tools.domain.Null;
-import com.google.common.reflect.TypeToken;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.testng.annotations.Test;
 
 /**
- * Tests for invoking AbstractPipelineProcessor.
+ * Tests for invoking PipelineProcessor.
  * 
  * @author cdancy
  */
 public class PipelineProcessorTest {
-   
-    private static final AtomicInteger bears = new AtomicInteger(0);
-    
-    class Handler1 implements Function<String, Object> {
+       
+    class VoidInput implements Function<Void, Object> {
         
         @Override
-        @Nullable
-        public Object apply(final String object) {
-            System.out.println("Input1: " + object);
+        public Object apply(final Void object) {
+            return new Object();
+        }
+    }
+    
+    class NullInput implements Function<Null, Object> {
+        
+        @Override
+        public Object apply(final Null object) {
+            return new Object();
+        }
+    }
+    
+    class VoidOutput implements Function<Object, Void> {
+        
+        @Override
+        public Void apply(final Object object) {
             return null;
         }
     }
     
-    class Handler2 implements Function<Null, Optional<Boolean>> {
+    class NullOutput implements Function<Object, Null> {
+        
         @Override
-        public Optional<Boolean> apply(final Null object) {
-
-            if (bears.get() == 0) {
-                bears.incrementAndGet();
-                System.out.println("inside failure pop");
-                throw new RuntimeException("FAILURE FROM BEARS");
-            } else {
-                System.out.println("we can keep going");
-            }
-            System.out.println("Input2: " + object);
-            return Optional.empty();
+        public Null apply(final Object object) {
+            return null;
         }
     }
+    
+    class NullableInput implements Function<Boolean, Object> {
         
-    class Handler3 implements Comparable, Function<Optional<Boolean>, String> {
+        @Override
+        public Object apply(@Nullable final Boolean object) {
+            return new Object();
+        }
+    }
+    
+    class NullableOutput implements Function<Boolean, Object> {
+        
         @Override
         @Nullable
-        public String apply(final Optional<Boolean> object) {
-            System.out.println("Input3: " + object);
-            return "123";
-        }
-
-        @Override
-        public int compareTo(final Object object) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        public Object apply(@Nullable final Boolean object) {
+            return object;
         }
     }
         
     @Test
-    public void testSomeLibraryMethod() {
-            
-        final PipelineProcessor.Builder builder2 = PipelineProcessor.builder();
-        
-        
-        System.out.println("Found: " + TypeToken.of(builder2.getClass()));
-        //final Optional<String> fish = Optional.<String>empty();
-        //System.out.println(TypeToken.of(fish.getClass().getGenericSuperclass()));
-        final PipelineProcessor processor = builder2.handler(Handler1.class).handler(Handler2.class).handler(Handler3.class).build();
-        
-        
-        final Object obj = processor.output("bears: " + TypeUtils.parseClassType(processor));
-
-        System.out.println("output: " + obj);
+    public void testNullInputOnVoid() {            
+        PipelineProcessor.builder().handler(VoidInput.class).build().output(null);
+    }
+    
+    @Test
+    public void testNullInputOnNull() {            
+        PipelineProcessor.builder().handler(NullInput.class).build().output(null);
+    }
+    
+    @Test
+    public void testNullOutput() {            
+        final Object obj = PipelineProcessor.builder().handler(NullOutput.class).build().output(123);
+        assertThat(obj).isNull();
+    }
+    
+    @Test
+    public void testVoidOutput() {            
+        final Object obj = PipelineProcessor.builder().handler(VoidOutput.class).build().output(123);
+        assertThat(obj).isNull();
+    }    
+    
+    @Test
+    public void testNullInputOnNullableInput() {            
+        PipelineProcessor.builder().handler(NullableInput.class).build().output(null);
+    }
+    
+    @Test
+    public void testNullInputOnNullableOutput() {            
+        final Object obj = PipelineProcessor.builder().handler(NullableOutput.class).build().output(null);
+        assertThat(obj).isNull();
     }
 }

@@ -132,7 +132,7 @@ public class PipelineHandler <V, R> {
                     break;
                 }
             }
-            
+
             final boolean[] pair = {inputNullable, outputNullable};
             return pair;
         } catch (NoSuchMethodException | SecurityException ex) {

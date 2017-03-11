@@ -26,6 +26,8 @@ public class PipelineConstants {
    
     public static final String FUNCTION_REGEX = "^java.util.function.Function$";
     
+    public static final String NULL_ALLOWED_TYPE_REGEX = "^(com.github.aap.processor.tools.domain.Null|java.lang.Void)$";
+
     // to satisfy PMD
     public static final String INDEX_STRING = ") at index ";
 
