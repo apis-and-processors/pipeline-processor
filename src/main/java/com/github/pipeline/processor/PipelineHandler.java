@@ -19,6 +19,9 @@ package com.github.pipeline.processor;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
+import static com.github.pipeline.processor.PipelineConstants.NULL_ALLOWED_TYPE_REGEX;
+
 import com.github.aap.processor.tools.TypeUtils;
 import com.github.aap.processor.tools.domain.ClassType;
 import java.lang.annotation.Annotation;
@@ -50,9 +53,17 @@ public class PipelineHandler <V, R> {
 
     private PipelineHandler(final Function function, final boolean inputNullable, final boolean outputNullable) {
         this.function = function;
-        this.inputNullable = inputNullable;
-        this.outputNullable = outputNullable;
         this.classType = TypeUtils.parseClassType(function);
+        this.inputNullable = inputNullable;
+        
+        // if output is not annotated with @Nullable check if return type
+        // accepts a NULL value (e.g. Void or Null class types).
+        if (!outputNullable) {
+            final ClassType possibleNullAllowedType = this.classType.firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(1);
+            this.outputNullable = possibleNullAllowedType.name().matches(NULL_ALLOWED_TYPE_REGEX);
+        } else {
+            this.outputNullable = outputNullable;
+        }
     }
     
     /**

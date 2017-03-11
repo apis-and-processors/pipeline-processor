@@ -157,11 +157,8 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
 
                         // ensure null outputs are allowed if applicable
                         if (handlerOutput == null && !handle.outputNullable()) {
-                            final ClassType possibleNullAllowedType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(1);
-                            if (!possibleNullAllowedType.name().matches(NULL_ALLOWED_TYPE_REGEX)) {
-                                throw new NullNotAllowedException("PipelineHandler (" 
-                                        + handle.id() + INDEX_STRING + i + " does not permit NULL outputs");
-                            }
+                            throw new NullNotAllowedException("PipelineHandler (" 
+                                    + handle.id() + INDEX_STRING + i + " does not permit NULL outputs");
                         }
                         
                         responseReference.set(handlerOutput);
