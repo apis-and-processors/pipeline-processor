@@ -117,7 +117,7 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
          * @param subscriber the Subscriber to add to this handler
          * @return this Builder.
          */
-        public Builder subscribe(final Subscriber subscriber) {
+        public Builder subscriber(final Subscriber subscriber) {
             subscribers.add(checkNotNull(subscriber, "subscriber cannot be null"));
             return this;
         }
@@ -128,7 +128,7 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
          * @param retryPolicy the RetryPolicy to add to this PipelineProcessor
          * @return this Builder.
          */
-        public Builder subscribe(final RetryPolicy retryPolicy) {
+        public Builder retryPolicy(final RetryPolicy retryPolicy) {
             this.retryPolicy = checkNotNull(retryPolicy, "retryPolicy cannot be null");
             return this;
         }

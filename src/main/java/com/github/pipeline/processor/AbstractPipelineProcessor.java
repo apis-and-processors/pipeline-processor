@@ -19,7 +19,6 @@ package com.github.pipeline.processor;
 
 import static com.github.pipeline.processor.PipelineConstants.INDEX_STRING;
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
-import static com.github.pipeline.processor.PipelineConstants.NULL_ALLOWED_TYPE_REGEX;
 import com.github.aap.processor.tools.TypeUtils;
 import com.github.aap.processor.tools.domain.ClassType;
 import com.github.aap.processor.tools.domain.Null;
@@ -53,7 +52,7 @@ import org.reactivestreams.Subscriber;
 public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
     
     public static final Logger LOGGER = Logger.getLogger(AbstractPipelineProcessor.class.getName());
-    public static final RetryPolicy DEFAULT_RETRY_POLICY = new RetryPolicy().withMaxRetries(5);
+    public static final RetryPolicy DEFAULT_RETRY_POLICY = new RetryPolicy().withMaxRetries(0);
     
     public static final String RETRY_ATTEMPT_MESSAGE = "Execution attempt failed due to: {0}";
     public static final String RETRY_FAILED_MESSAGE = "Execution failed due to: {0}";
@@ -105,13 +104,13 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
                     LOGGER.log(Level.WARNING, RETRY_ATTEMPT_MESSAGE, failure.getMessage()); 
                 })
                 .onFailure(failure -> LOGGER.log(Level.SEVERE, RETRY_FAILED_MESSAGE, failure.getMessage()))
-                .run(ctx -> { 
+                .run(ctx -> {
 
                     for (int i = indexReference.get(); i < pipeline.size(); i++) {
                         indexReference.incrementAndGet();
 
                         final PipelineHandler handle = pipeline.get(i);
-                        LOGGER.log(Level.INFO, RETRY_RUN_MESSAGE, handle.id());
+                        LOGGER.log(Level.FINE, RETRY_RUN_MESSAGE, handle.id());
 
                         // ensure null inputs are allowed if applicable
                         if (responseReference.get() == null && !handle.inputNullable()) {

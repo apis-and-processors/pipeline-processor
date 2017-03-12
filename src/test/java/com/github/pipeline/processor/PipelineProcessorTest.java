@@ -30,7 +30,7 @@ import org.testng.annotations.Test;
  * @author cdancy
  */
 public class PipelineProcessorTest {
-       
+
     class VoidInput implements Function<Void, Object> {
         
         @Override
