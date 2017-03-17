@@ -30,6 +30,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import net.jodah.failsafe.RetryPolicy;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
 /**
@@ -68,7 +69,7 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
         return new Builder();
     }
     
-    public static class Builder {
+    public static class Builder implements Publisher {
     
         private final Logger logger = Logger.getLogger(PipelineProcessor.class.getName());
         private final List<PipelineHandler> pipelineHandlers = Lists.newArrayList();
@@ -112,14 +113,30 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
         }
         
         /**
-         * Add subscriber to this handler to be notified of updates.
+         * Add class subscriber to this handler to be notified of updates.
+         * 
+         * @param subscriber the Subscriber to add to this handler
+         * @return this Builder.
+         */
+        public Builder subscriber(final Class<? extends Subscriber> subscriber) {
+            subscribe(ReflectionUtils.newInstance(subscriber));
+            return this;
+        }
+        
+        /**
+         * Add instance of subscriber to this handler to be notified of updates.
          * 
          * @param subscriber the Subscriber to add to this handler
          * @return this Builder.
          */
         public Builder subscriber(final Subscriber subscriber) {
-            subscribers.add(checkNotNull(subscriber, "subscriber cannot be null"));
+            subscribe(subscriber);
             return this;
+        }
+        
+        @Override
+        public void subscribe(final Subscriber subscriber) {
+            subscribers.add(checkNotNull(subscriber, "subscriber cannot be null"));
         }
         
         /**
