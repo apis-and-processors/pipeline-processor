@@ -57,6 +57,7 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
     public static final String RETRY_ATTEMPT_MESSAGE = "Execution attempt failed due to: {0}";
     public static final String RETRY_FAILED_MESSAGE = "Execution failed due to: {0}";
     public static final String RETRY_RUN_MESSAGE = "Execution attempt on {0}";
+    public static final String SUCCESS_MESSAGE = "Execution was successful on {0}";
 
     protected final List<? extends PipelineHandler> pipeline;
     protected final List<Subscriber> subscribers;
@@ -100,10 +101,30 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
 
         Failsafe.with(retryPolicy)
                 .onFailedAttempt(failure ->  {
-                    indexReference.decrementAndGet(); 
                     LOGGER.log(Level.WARNING, RETRY_ATTEMPT_MESSAGE, failure.getMessage()); 
+
+                    indexReference.decrementAndGet(); 
                 })
-                .onFailure(failure -> LOGGER.log(Level.SEVERE, RETRY_FAILED_MESSAGE, failure.getMessage()))
+                .onSuccess(success -> {
+                    LOGGER.log(Level.FINE, SUCCESS_MESSAGE, success);
+                    
+                    // fulfill contract for reactive-streams.onComplete
+                    if (this.subscribers().size() > 0) {
+                        for (int i = 0; i < this.subscribers().size(); i++) {
+                            this.subscribers().get(i).onComplete();
+                        }
+                    }
+                })
+                .onFailure(failure -> { 
+                    LOGGER.log(Level.SEVERE, RETRY_FAILED_MESSAGE, failure.getMessage());
+                    
+                    // fulfill contract for reactive-streams.onError
+                    if (this.subscribers().size() > 0) {
+                        for (int i = 0; i < this.subscribers().size(); i++) {
+                            this.subscribers().get(i).onError(failure);
+                        }
+                    }
+                })
                 .run(ctx -> {
 
                     for (int i = indexReference.get(); i < pipeline.size(); i++) {

@@ -39,7 +39,7 @@ public class PipelineProcessorRetriesTest {
         
         @Override
         public Object apply(final Boolean object) {
-            int value = INCREMENTER.incrementAndGet();
+            final int value = INCREMENTER.incrementAndGet();
             if (value < 5) {
                 throw new RuntimeException("1");
             }
