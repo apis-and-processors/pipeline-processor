@@ -180,7 +180,14 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
                             throw new NullNotAllowedException("PipelineHandler (" 
                                     + handle.id() + INDEX_STRING + i + " does not permit NULL outputs");
                         }
-                        
+
+                        // fulfill contract for reactive-streams.onNext
+                        if (this.subscribers().size() > 0) {
+                            for (int j = 0; j < this.subscribers().size(); j++) {
+                                this.subscribers().get(j).onNext(handlerOutput);
+                            }
+                        }
+                    
                         responseReference.set(handlerOutput);
                     }
                 });

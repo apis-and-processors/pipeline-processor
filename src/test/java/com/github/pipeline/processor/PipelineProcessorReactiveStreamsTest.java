@@ -34,6 +34,7 @@ import org.testng.annotations.Test;
  */
 public class PipelineProcessorReactiveStreamsTest {
 
+    private final String helloWorld = "Hello, World!";
     private final RetryPolicy retries = new RetryPolicy().withMaxRetries(2);
     
     private class MySubscriber implements Subscriber {
@@ -88,12 +89,12 @@ public class PipelineProcessorReactiveStreamsTest {
         
         @Override
         public String apply(final Integer object) {
-            return "Hello, World!";
+            return helloWorld;
         }
     }
-        
+     
     @Test
-    public void testOnCompleteIsCalled() {
+    public void testOnNext() {
         final MySubscriber subscriber = new MySubscriber();
         final PipelineProcessor processor = PipelineProcessor.builder()
                 .handler(Handler1.class)
@@ -102,13 +103,38 @@ public class PipelineProcessorReactiveStreamsTest {
                 .retryPolicy(retries)
                 .subscriber(subscriber).build();
         final String output = (String) processor.output(true);
-        assertThat(output).isEqualTo("Hello, World!");
+        assertThat(output).isEqualTo(helloWorld);
+        assertThat(subscriber.onNextObjects.size()).isEqualTo(3);
+        
+        assertThat(subscriber.onNextObjects.get(0)).isInstanceOf(String.class);
+        assertThat(subscriber.onNextObjects.get(0)).isEqualTo("hello");
+        assertThat(subscriber.onNextObjects.get(1)).isInstanceOf(Integer.class);
+        assertThat(subscriber.onNextObjects.get(1)).isEqualTo(123);
+        assertThat(subscriber.onNextObjects.get(2)).isInstanceOf(String.class);
+        assertThat(subscriber.onNextObjects.get(2)).isEqualTo(helloWorld);
+
         assertThat(subscriber.onCompleteCalled).isEqualTo(1);
         assertThat(subscriber.onErrorThrowables.size()).isEqualTo(0);
     }
     
     @Test
-    public void testOnErrorIsCalled() {
+    public void testOnComplete() {
+        final MySubscriber subscriber = new MySubscriber();
+        final PipelineProcessor processor = PipelineProcessor.builder()
+                .handler(Handler1.class)
+                .handler(Handler2.class)
+                .handler(Handler3.class)
+                .retryPolicy(retries)
+                .subscriber(subscriber).build();
+        final String output = (String) processor.output(true);
+        assertThat(output).isEqualTo(helloWorld);
+        assertThat(subscriber.onNextObjects.size()).isEqualTo(3);
+        assertThat(subscriber.onCompleteCalled).isEqualTo(1);
+        assertThat(subscriber.onErrorThrowables.size()).isEqualTo(0);
+    }
+    
+    @Test
+    public void testOnError() {
         final MySubscriber subscriber = new MySubscriber();
         final PipelineProcessor processor = PipelineProcessor.builder()
                 .handler(Handler1.class)
@@ -125,6 +151,7 @@ public class PipelineProcessorReactiveStreamsTest {
         }
         
         assertThat(thrownException).isNotNull();
+        assertThat(subscriber.onNextObjects.size()).isEqualTo(1);
         assertThat(subscriber.onCompleteCalled).isEqualTo(0);
         assertThat(subscriber.onErrorThrowables.size()).isEqualTo(1);
         assertThat(subscriber.onErrorThrowables.get(0).getMessage()).isEqualTo(thrownException.getMessage());
