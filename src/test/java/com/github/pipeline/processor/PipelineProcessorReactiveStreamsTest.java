@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.common.collect.Lists;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
 import net.jodah.failsafe.RetryPolicy;
 import org.reactivestreams.Subscriber;
@@ -92,6 +93,27 @@ public class PipelineProcessorReactiveStreamsTest {
             return helloWorld;
         }
     }
+    
+    class ListReturner implements Function<Boolean, List<String>> {
+        
+        @Override
+        public List<String> apply(final Boolean object) {
+            final List<String> temp = Lists.newArrayList("asdf");
+            return temp;
+        }
+    }
+    
+    class ListAcceptor implements Function<List<String>, List<String>> {
+        
+        @Override
+        public List<String> apply(final List<String> object) {
+            if (object == null) {
+                throw new RuntimeException("List is NULL");
+            } else {
+                return object;
+            }
+        }
+    }
      
     @Test
     public void testOnNext() {
@@ -115,6 +137,44 @@ public class PipelineProcessorReactiveStreamsTest {
 
         assertThat(subscriber.onCompleteCalled).isEqualTo(1);
         assertThat(subscriber.onErrorThrowables.size()).isEqualTo(0);
+    }
+    
+    @Test
+    public void testOnNextAlterValues() {
+        final Subscriber subscriber = new Subscriber() {
+            
+            @Override
+            public void onSubscribe(final Subscription instance) {
+                // ignore
+            }
+
+            @Override
+            public void onNext(final Object instance) {
+                if (instance instanceof List) {
+                    List<String> bears = (List)instance;
+                    bears.add(UUID.randomUUID().toString());
+                }
+            }
+
+            @Override
+            public void onError(final Throwable instance) {
+                // ignore
+            }
+
+            @Override
+            public void onComplete() {
+                // ignore
+            }
+        };
+        
+        final PipelineProcessor processor = PipelineProcessor.builder()
+                .handler(ListReturner.class)
+                .handler(ListAcceptor.class)
+                .retryPolicy(retries)
+                .subscriber(subscriber).build();
+        final List<String> output = (List) processor.output(true);
+        assertThat(output).isNotNull();
+        assertThat(output.size()).isEqualTo(3);
     }
     
     @Test
