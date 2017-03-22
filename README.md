@@ -55,6 +55,24 @@ You can optionally give an input to the first Function within the processor (ass
 
     Object obj = processor.output(123);
 
+## On @Nullable
+
+Often times it is desirable to accept or return a potentially null value. By default `pipeline-processor` guards against this and will throw a `NullNotAllowedException` should a null be passed to or returned from any `Function` which does not allow it. To get around this you can annotate the output (i.e. the method definition) or the input (i.e. method parameter) with `@Nullable` to ensure no exception is thrown. Consider the following:
+
+    class MyHandler implements Function<String, Integer> {
+        
+        @Nullable
+        public Integer apply(@Nullable String object) {
+            if (object == null) {
+                return null;
+            } else {
+                Integer.valueOf(object);
+            }
+        }
+    }
+
+The `MyHandler` class allows for null to be passed in as input by having the `String` parameter annotated with `@Nullable`. It also allows for null to be returned by annotating the output with `@Nullable`.
+
 ## On RetryPolicy
 
 As the pipeline itself is executed with [failsafe](https://github.com/jhalterman/failsafe) you can optionally pass in a `RetryPolicy` to the Builder:
