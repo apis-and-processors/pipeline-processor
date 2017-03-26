@@ -32,7 +32,7 @@ repositories {
 }
 
 dependencies {
-    compile group: "com.github.aap", name: "processor-tools", version: "0.0.1-SNAPSHOT", changing: true
+    compile group: "com.github.aap", name: "processor-tools", version: "0.0.5-SNAPSHOT", changing: true
     compile 'org.reactivestreams:reactive-streams:1.0.0'
     compile 'com.google.guava:guava:21.0'
     compile 'com.google.code.findbugs:jsr305:3.0.1'
