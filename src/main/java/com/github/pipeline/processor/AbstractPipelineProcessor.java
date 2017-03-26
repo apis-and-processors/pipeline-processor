@@ -19,10 +19,12 @@ package com.github.pipeline.processor;
 
 import static com.github.pipeline.processor.PipelineConstants.INDEX_STRING;
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
-import com.github.aap.processor.tools.TypeUtils;
+
+import com.github.aap.processor.tools.ClassTypeParser;
 import com.github.aap.processor.tools.domain.ClassType;
 import com.github.aap.processor.tools.domain.Null;
 import com.github.aap.processor.tools.exceptions.TypeMismatchException;
+import com.github.pipeline.processor.domain.PipelineSubscription;
 import com.github.pipeline.processor.exceptions.NullNotAllowedException;
 import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
 import com.github.pipeline.processor.utils.PipelineUtils;
@@ -60,7 +62,7 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
     public static final String SUCCESS_MESSAGE = "Execution was successful on {0}";
 
     protected final List<? extends PipelineHandler> pipeline;
-    protected final List<Subscriber> subscribers;
+    protected final List<PipelineSubscription> subscribers;
     protected final RetryPolicy retryPolicy;
     protected final Map<Integer, ClassType> runtimePipelineChecks;
     
@@ -76,7 +78,22 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
             final RetryPolicy retryPolicy) {
         
         this.pipeline = pipeline;
-        this.subscribers = subscribers != null ? ImmutableList.copyOf(subscribers) : ImmutableList.<Subscriber>of();
+
+        // generate Subscription object for each Subscriber
+        if (subscribers != null && subscribers.size() > 0) {
+            final ImmutableList.Builder<PipelineSubscription> builder = ImmutableList.<PipelineSubscription> builder();
+            for (int i = 0; i < subscribers.size(); i++) {
+                
+                // fulfill contract for reactive-streams.onSubscribe
+                final PipelineSubscription subscription = PipelineSubscription.newInstance(subscribers.get(i));
+                subscription.subscriber().onSubscribe(subscription);
+                builder.add(subscription);
+            }
+            this.subscribers = builder.build();
+        } else {
+            this.subscribers = ImmutableList.<PipelineSubscription> of();
+        }
+        
         this.retryPolicy = (retryPolicy != null 
                 ? retryPolicy
                 : DEFAULT_RETRY_POLICY).abortOn(NullNotAllowedException.class, ProcessTimeTypeMismatchException.class);
@@ -110,8 +127,11 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
                     
                     // fulfill contract for reactive-streams.onComplete
                     if (this.subscribers().size() > 0) {
-                        for (int i = 0; i < this.subscribers().size(); i++) {
-                            this.subscribers().get(i).onComplete();
+                        for (int index = 0; index < this.subscribers().size(); index++) {
+                            final PipelineSubscription psub = this.subscribers().get(index);
+                            if (!psub.isCancelled()) {
+                                psub.subscriber().onComplete();
+                            }
                         }
                     }
                 })
@@ -120,8 +140,11 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
                     
                     // fulfill contract for reactive-streams.onError
                     if (this.subscribers().size() > 0) {
-                        for (int i = 0; i < this.subscribers().size(); i++) {
-                            this.subscribers().get(i).onError(failure);
+                        for (int index = 0; index < this.subscribers().size(); index++) {
+                            final PipelineSubscription psub = this.subscribers().get(index);
+                            if (!psub.isCancelled()) {
+                                psub.subscriber().onError(failure);
+                            }
                         }
                     }
                 })
@@ -150,7 +173,7 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
                         }
 
                         if (expectedClassType != null) {
-                            final ClassType handlerClassType = TypeUtils.parseClassType(responseReference.get());
+                            final ClassType handlerClassType = ClassTypeParser.parse(responseReference.get());
 
                             // ignore Null class as we would have not been able 
                             // to reach this point if they weren't allowed
@@ -183,8 +206,11 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
 
                         // fulfill contract for reactive-streams.onNext
                         if (this.subscribers().size() > 0) {
-                            for (int j = 0; j < this.subscribers().size(); j++) {
-                                this.subscribers().get(j).onNext(handlerOutput);
+                            for (int index = 0; index < this.subscribers().size(); index++) {
+                                final PipelineSubscription psub = this.subscribers().get(index);
+                                if (!psub.isCancelled()) {
+                                    psub.subscriber().onNext(handlerOutput);
+                                }
                             }
                         }
                     
@@ -196,11 +222,11 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
     }
     
     /**
-     * Get list of Subscribers.
+     * Immutable list of PipelineSubscription's.
      * 
      * @return list of Subscribers
      */
-    public List<Subscriber> subscribers() {
+    public List<PipelineSubscription> subscribers() {
         return this.subscribers;
     }
 }

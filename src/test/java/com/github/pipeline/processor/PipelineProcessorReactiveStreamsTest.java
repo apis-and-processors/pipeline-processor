@@ -22,6 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import net.jodah.failsafe.RetryPolicy;
 import org.reactivestreams.Subscriber;
@@ -38,6 +40,34 @@ public class PipelineProcessorReactiveStreamsTest {
     private final String helloWorld = "Hello, World!";
     private final RetryPolicy retries = new RetryPolicy().withMaxRetries(2);
     
+    private class Tester implements Subscriber {
+
+        public Subscription subscription;
+        public final List<Object> onNextObjects = Lists.newArrayList();
+        public final List<Throwable> onErrorThrowables = Lists.newArrayList();
+        public int onCompleteCalled;
+        
+        @Override
+        public void onSubscribe(final Subscription subscription) {
+            this.subscription = subscription;
+        }
+
+        @Override
+        public void onNext(final Object instance) {
+            this.onNextObjects.add(instance);
+        }
+
+        @Override
+        public void onError(final Throwable thrwbl) {
+            this.onErrorThrowables.add(thrwbl);
+        }
+
+        @Override
+        public void onComplete() {
+            this.onCompleteCalled++;
+        }
+    }
+       
     private class MySubscriber implements Subscriber {
 
         public Subscription subscription;
@@ -114,7 +144,7 @@ public class PipelineProcessorReactiveStreamsTest {
             }
         }
     }
-     
+    
     @Test
     public void testOnNext() {
         final MySubscriber subscriber = new MySubscriber();
@@ -123,6 +153,7 @@ public class PipelineProcessorReactiveStreamsTest {
                 .handler(Handler2.class)
                 .handler(Handler3.class)
                 .retryPolicy(retries)
+                .subscriber(MySubscriber.class)
                 .subscriber(subscriber).build();
         final String output = (String) processor.output(true);
         assertThat(output).isEqualTo(helloWorld);
@@ -215,5 +246,78 @@ public class PipelineProcessorReactiveStreamsTest {
         assertThat(subscriber.onCompleteCalled).isEqualTo(0);
         assertThat(subscriber.onErrorThrowables.size()).isEqualTo(1);
         assertThat(subscriber.onErrorThrowables.get(0).getMessage()).isEqualTo(thrownException.getMessage());
+    }
+    
+    @Test
+    public void testOnCancel() {
+        
+        final AtomicReference<Subscription> subscription = new AtomicReference<>(null);
+        final AtomicInteger onNextCalled = new AtomicInteger(0);
+        final AtomicReference<Throwable> onErrorCalled = new AtomicReference<>(null);
+        final AtomicInteger onCompleteCalled = new AtomicInteger(0);
+            
+        final Subscriber tester = new Subscriber() {
+
+            @Override
+            public void onSubscribe(final Subscription sub) {
+                subscription.set(sub);
+            }
+
+            @Override
+            public void onNext(final Object instance) {
+                if (instance instanceof Subscription) {
+                    Subscription sub = (Subscription)instance;
+                    sub.cancel();
+                }
+                onNextCalled.incrementAndGet();
+            }
+
+            @Override
+            public void onError(final Throwable thrwbl) {
+                onErrorCalled.set(thrwbl);
+            }
+
+            @Override
+            public void onComplete() {
+                onCompleteCalled.incrementAndGet();
+            }
+        };
+        
+        final Function innerFuncOne = new Function<Void, Subscription>() {
+            
+            @Override
+            public Subscription apply(final Void instance) {
+                return subscription.get();
+            }
+        };
+        
+        final Function innerFuncTwo = new Function<Subscription, Boolean>() {
+            
+            @Override
+            public Boolean apply(final Subscription instance) {
+                return true;
+            }
+        };
+                
+        final Function innerFuncThree = new Function<Boolean, String>() {
+            
+            @Override
+            public String apply(final Boolean instance) {
+                return helloWorld;
+            }
+        };
+        
+        final PipelineProcessor processor = PipelineProcessor.builder()
+                .handler(innerFuncOne)
+                .handler(innerFuncTwo)
+                .handler(innerFuncThree)
+                .retryPolicy(retries)
+                .subscriber(tester).build();
+        
+        final String output = (String) processor.output();
+        assertThat(output).isEqualTo(helloWorld);
+        assertThat(onNextCalled.get()).isEqualTo(1);        
+        assertThat(onCompleteCalled.get()).isEqualTo(0);
+        assertThat(onErrorCalled.get()).isNull();
     }
 }

@@ -22,7 +22,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
 import static com.github.pipeline.processor.PipelineConstants.NULL_ALLOWED_TYPE_REGEX;
 
-import com.github.aap.processor.tools.TypeUtils;
+import com.github.aap.processor.tools.ClassTypeParser;
 import com.github.aap.processor.tools.domain.ClassType;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -53,7 +53,7 @@ public class PipelineHandler <V, R> {
 
     private PipelineHandler(final Function function, final boolean inputNullable, final boolean outputNullable) {
         this.function = function;
-        this.classType = TypeUtils.parseClassType(function);
+        this.classType = ClassTypeParser.parse(function);
         this.inputNullable = inputNullable;
         
         // if output is not annotated with @Nullable check if return type

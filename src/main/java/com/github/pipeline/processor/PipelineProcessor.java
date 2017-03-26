@@ -20,7 +20,7 @@ package com.github.pipeline.processor;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.github.aap.processor.tools.ReflectionUtils;
+import com.github.aap.processor.tools.ReflectionMagic;
 
 import com.google.common.collect.Lists;
 import java.util.Collections;
@@ -84,7 +84,7 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
          */
         public Builder handler(final Class<? extends Function> pipelineHandler) {
             checkNotNull(pipelineHandler, "pipelineHandler cannot be null");
-            return handler(ReflectionUtils.newInstance(pipelineHandler));
+            return handler(ReflectionMagic.newInstance(pipelineHandler));
         }
         
         /**
@@ -119,7 +119,7 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
          * @return this Builder.
          */
         public Builder subscriber(final Class<? extends Subscriber> subscriber) {
-            subscribe(ReflectionUtils.newInstance(subscriber));
+            subscribe(ReflectionMagic.newInstance(subscriber));
             return this;
         }
         
