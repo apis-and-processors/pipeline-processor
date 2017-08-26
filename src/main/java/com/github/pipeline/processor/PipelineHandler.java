@@ -85,10 +85,10 @@ public class PipelineHandler <V, R> {
     }
     
     /**
-     * ClassType instance of the backing com.google.common.base.Function or java.util.function.Function. 
+     * ClassType instance of java.util.function.Function. 
      * Allows us to know what needs to be passed in and what needs to be returned at checktime and runtime.
      * 
-     * @return ClassType instance for backing com.google.common.base.Function or java.util.function.Function
+     * @return ClassType instance for backing java.util.function.Function
      */
     public ClassType classType() {
         return this.classType;
