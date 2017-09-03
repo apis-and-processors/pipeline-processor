@@ -18,8 +18,8 @@
 package com.github.pipeline.processor.exceptions;
 
 /**
- * Thrown when any inputs/outputs do not match during initialization pass 
- * of a given PipelineProcessor.
+ * Meant to be thrown during "check time" (i.e. when pipeline is built and BEFORE execution)
+ * when the outputs of one handler don't match the inputs of the successive handler.
  * 
  * @author cdancy
  */

@@ -19,6 +19,7 @@ package com.github.pipeline.processor;
 
 import static com.github.pipeline.processor.PipelineConstants.INDEX_STRING;
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
+import static com.github.pipeline.processor.PipelineConstants.NULL_ALLOWED_TYPE_REGEX;
 
 import com.github.aap.processor.tools.ClassTypeParser;
 import com.github.aap.processor.tools.domain.ClassType;
@@ -29,6 +30,7 @@ import com.github.pipeline.processor.exceptions.NullNotAllowedException;
 import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
 import com.github.pipeline.processor.utils.PipelineUtils;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 
 import java.util.List;
 import java.util.Map;
@@ -105,7 +107,7 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
      * This is analogous to starting the pipeline.
      * 
      * @param input optional initial input into PipelineProcessor.
-     * @return Optional which encapsulates the potentially NULL value.
+     * @return output of PipelineProcessor invocation.
      */
     @Override
     public R apply(@Nullable final V input) {
@@ -115,10 +117,13 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
         
         // holds the starting point of next handler to execute
         final AtomicInteger indexReference = new AtomicInteger(0);
+        
+        // local cache for handlers to set/get and pass amongst themselves
+        final Map<String, Object> cache = Maps.newHashMap();
 
         Failsafe.with(retryPolicy)
                 .onFailedAttempt(failure ->  {
-                    LOGGER.log(Level.WARNING, RETRY_ATTEMPT_MESSAGE, failure.getMessage()); 
+                    LOGGER.log(Level.WARNING, RETRY_ATTEMPT_MESSAGE, failure.getMessage());
 
                     indexReference.decrementAndGet(); 
                 })
@@ -155,9 +160,16 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
 
                         final PipelineHandler handle = pipeline.get(i);
                         LOGGER.log(Level.FINE, RETRY_RUN_MESSAGE, handle.id());
-
-                        // ensure null inputs are allowed if applicable
-                        if (responseReference.get() == null && !handle.inputNullable()) {
+                        
+                        Object potentialInputValue = null;
+                        if (handle.inputCacheKey() != null) {
+                            potentialInputValue = cache.get(handle.inputCacheKey());
+                            responseReference.set(null);
+                        } else {
+                            potentialInputValue = responseReference.get();
+                        }
+                                                
+                        if (potentialInputValue == null && !handle.inputNullable()) {
                             final ClassType inputType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
                             if (!(inputType.toString().equals(Void.class.getName()) 
                                     || inputType.toString().equals(Null.class.getName()))) {
@@ -173,7 +185,7 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
                         }
 
                         if (expectedClassType != null) {
-                            final ClassType handlerClassType = ClassTypeParser.parse(responseReference.get());
+                            final ClassType handlerClassType = ClassTypeParser.parse(potentialInputValue);
 
                             // ignore Null class as we would have not been able 
                             // to reach this point if they weren't allowed
@@ -195,8 +207,34 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
                             }
                         }
 
-                        // process function
-                        final Object handlerOutput = handle.process(responseReference.get());
+                        // get input from cache if applicable otherwise assume it came
+                        // from previous handler as per usual.
+                        Object handlerInput = null;
+                        if (handle.inputCacheKey() != null) {
+                            handlerInput = cache.get(handle.inputCacheKey());
+                        } else {
+                            
+                            // if previous PipelineHandler set its output to cache
+                            // it's possible the current handler is not looking
+                            // for its output but instead is looking for null/void.
+                            if (i > 0) {
+                                final PipelineHandler previousHandle = pipeline.get(i - 1);
+                                if (previousHandle.outputCacheKey() != null) {
+                                    final ClassType inputType = handle.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(0);
+                                    if (inputType.toString().matches(NULL_ALLOWED_TYPE_REGEX)) {
+                                        handlerInput = inputType.toInstance();
+                                    }
+                                }
+                            }
+                            
+                            // if handlerInput still hasn't been set then use
+                            // previously set reference.
+                            if (handlerInput == null) {
+                                handlerInput = potentialInputValue;
+                            }
+                        }
+
+                        final Object handlerOutput = handle.process(handlerInput);
 
                         // ensure null outputs are allowed if applicable
                         if (handlerOutput == null && !handle.outputNullable()) {
@@ -214,10 +252,17 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
                             }
                         }
                     
+                        // add output to cache if requested
+                        if (!(i == pipeline.size() - 1) && handle.outputCacheKey() != null) {
+                            LOGGER.log(Level.FINE, "Adding to cache with key '" + handle.outputCacheKey() + "'", handle.id());
+                            cache.put(handle.outputCacheKey(), handlerOutput);
+                        }
+                        
                         responseReference.set(handlerOutput);
                     }
                 });
         
+        cache.clear();
         return (R) responseReference.get();
     }
     

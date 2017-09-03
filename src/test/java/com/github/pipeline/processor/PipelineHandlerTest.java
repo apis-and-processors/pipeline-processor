@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
 import org.testng.annotations.Test;
 
 /**
- * Tests for PipelineHandler.
+ * Tests to exercise general PipelineHandler execution.
  * 
  * @author cdancy
  */

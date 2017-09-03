@@ -23,6 +23,7 @@ import com.github.aap.processor.tools.domain.ClassType;
 import com.github.aap.processor.tools.domain.Null;
 import com.github.pipeline.processor.PipelineHandler;
 import com.github.pipeline.processor.exceptions.CheckTimeTypeMismatchException;
+import com.github.pipeline.processor.exceptions.NullNotAllowedException;
 
 import com.google.common.collect.Lists;
 import java.util.List;
@@ -105,7 +106,7 @@ public class PipelineUtilsTest {
         PipelineUtils.typeCheckPipeline(pipeLine);
     }
     
-    @Test (expectedExceptions = NullPointerException.class)
+    @Test (expectedExceptions = NullNotAllowedException.class)
     public void testNullPointerExceptionOnPipeline() {
         final List<PipelineHandler> pipeLine = Lists.newArrayList();
         pipeLine.add(PipelineHandler.newInstance(new Handler2()));

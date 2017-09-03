@@ -18,8 +18,8 @@
 package com.github.pipeline.processor.exceptions;
 
 /**
- * Thrown when a null is either passed in or returned from a given Function
- * but is not allowed.
+ * Meant to be thrown when a NULL is not allowed (i.e. input to or output from
+ * a given handler was expected to be non-null but wasn't).
  * 
  * @author cdancy
  */

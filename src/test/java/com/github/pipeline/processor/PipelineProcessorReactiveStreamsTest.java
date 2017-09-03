@@ -31,7 +31,7 @@ import org.reactivestreams.Subscription;
 import org.testng.annotations.Test;
 
 /**
- * Tests for invoking PipelineProcessor with Reactive-Streams.
+ * Tests for exercising PipelineProcessor with Reactive-Streams.
  * 
  * @author cdancy
  */

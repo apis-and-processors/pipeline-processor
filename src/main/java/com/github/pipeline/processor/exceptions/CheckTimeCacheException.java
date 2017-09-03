@@ -18,28 +18,27 @@
 package com.github.pipeline.processor.exceptions;
 
 /**
- * Meant to be thrown during "process time" (i.e. after pipeline is built during execution)
- * when the outputs of one handler don't match the inputs of the successive handler. This
- * generally happens when the output or input of a given handler is of type Object and
- * but at runtime the actual type is different than what the user defined or expected.
+ * Meant to be thrown during "check time" (i.e. when pipeline is built and BEFORE execution) 
+ * when more than one @Cache annotation with the same key is present for the output of a 
+ * PipelineHandler OR when no key exists for the input to a given PipelineHandler.
  * 
  * @author cdancy
  */
-public class ProcessTimeTypeMismatchException extends RuntimeException {
+public class CheckTimeCacheException extends RuntimeException {
     
-    public ProcessTimeTypeMismatchException() {
+    public CheckTimeCacheException() {
         super();
     }
     
-    public ProcessTimeTypeMismatchException(final String message) {
+    public CheckTimeCacheException(final String message) {
         super(message);
     }
     
-    public ProcessTimeTypeMismatchException(final String message, final Throwable throwable) {
+    public CheckTimeCacheException(final String message, final Throwable throwable) {
         super(message, throwable);
     }
     
-    public ProcessTimeTypeMismatchException(final Throwable throwable) {
+    public CheckTimeCacheException(final Throwable throwable) {
         super(throwable);
     }
 }

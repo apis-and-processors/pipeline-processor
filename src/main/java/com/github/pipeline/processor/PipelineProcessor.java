@@ -156,7 +156,7 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
          * @return newly created PipelineProcessor.
          */
         public PipelineProcessor build() {
-            checkArgument(!pipelineHandlers.isEmpty(), "Cannot build processor with no handlers");
+            checkArgument(!pipelineHandlers.isEmpty(), "Cannot build " + PipelineProcessor.class.getSimpleName() + " with no handlers");
             return new PipelineProcessor(Collections.unmodifiableList(pipelineHandlers), subscribers, this.retryPolicy);
         }
     }

@@ -27,7 +27,7 @@ import net.jodah.failsafe.RetryPolicy;
 import org.testng.annotations.Test;
 
 /**
- * Tests for invoking PipelineProcessor with retries.
+ * Tests for exercising PipelineProcessor with retries.
  * 
  * @author cdancy
  */

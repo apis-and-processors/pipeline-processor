@@ -22,6 +22,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
 import static com.github.pipeline.processor.PipelineConstants.NULL_ALLOWED_TYPE_REGEX;
 
+import com.github.pipeline.processor.annotations.Cache;
+
 import com.github.aap.processor.tools.ClassTypeParser;
 import com.github.aap.processor.tools.domain.ClassType;
 import java.lang.annotation.Annotation;
@@ -49,9 +51,16 @@ public class PipelineHandler <V, R> {
     private final Function function;
     private final boolean inputNullable;
     private final boolean outputNullable;
+    private final String inputCacheKey;
+    private final String outputCacheKey;
     private final ClassType classType;
 
-    private PipelineHandler(final Function function, final boolean inputNullable, final boolean outputNullable) {
+    private PipelineHandler(final Function function, 
+            final boolean inputNullable, 
+            final boolean outputNullable, 
+            final String inputCacheKey, 
+            final String outputCacheKey) {
+        
         this.function = function;
         this.classType = ClassTypeParser.parse(function);
         this.inputNullable = inputNullable;
@@ -64,6 +73,9 @@ public class PipelineHandler <V, R> {
         } else {
             this.outputNullable = outputNullable;
         }
+        
+        this.inputCacheKey = inputCacheKey;
+        this.outputCacheKey = outputCacheKey;
     }
     
     /**
@@ -85,8 +97,27 @@ public class PipelineHandler <V, R> {
     }
     
     /**
+     * Key used to get input object from cache.
+     * 
+     * @return cache key or null if N/A.
+     */
+    public String inputCacheKey() {
+        return inputCacheKey;
+    }
+    
+    /**
+     * Key used to put output object into cache.
+     * 
+     * @return cache key or null if N/A.
+     */
+    public String outputCacheKey() {
+        return outputCacheKey;
+    }
+    
+    /**
      * ClassType instance of java.util.function.Function. 
-     * Allows us to know what needs to be passed in and what needs to be returned at checktime and runtime.
+     * Allows us to know what needs to be passed in and 
+     * what needs to be returned at checktime and runtime.
      * 
      * @return ClassType instance for backing java.util.function.Function
      */
@@ -116,38 +147,33 @@ public class PipelineHandler <V, R> {
      * @return newly created PipelineHandler
      */
     public static <V, R> PipelineHandler newInstance(final Function<V, R> function) {
-        checkNotNull(function, "function cannot be null");
-        final boolean [] pair = inputOutputNullables(function);
-        return new PipelineHandler(function, pair[0], pair[1]);
-    }
-    
-    /**
-     * Helper method to determine if a given function accepts null inputs and is 
-     * permitted to return null outputs.
-     * 
-     * @param function instance of java.util.function.Function
-     * @return boolean array of exactly size 2 where index 0 denotes if input is nullable and index 1 
-     *         denotes if output is nullable,
-     */
-    private static boolean[] inputOutputNullables(final Function function) {
+        checkNotNull(function, "function cannot be null");        
+        
         try {
             
             final Method applyMethod = function.getClass().getDeclaredMethod("apply", Object.class);
             final boolean outputNullable = applyMethod.getDeclaredAnnotation(Nullable.class) != null;
+            final Cache outputCacheAnno = applyMethod.getDeclaredAnnotation(Cache.class);            
+            final String outputCacheKey = (outputCacheAnno != null) ? outputCacheAnno.value() : null;
+
             boolean inputNullable = false;
             
+            String inputCacheKey = null;
             final Annotation[] parameterAnnotations = applyMethod.getParameterAnnotations()[0];
             for (int i = 0; i < parameterAnnotations.length; i++) {
-                if (parameterAnnotations[i].annotationType().equals(Nullable.class)) {
+                final Class <? extends Annotation> annoType = parameterAnnotations[i].annotationType();
+                if (annoType.equals(Nullable.class)) {
                     inputNullable = true;
-                    break;
+                } else if (annoType.equals(Cache.class)) {
+                    final Cache inputCacheAnno = (Cache)parameterAnnotations[i];
+                    inputCacheKey = inputCacheAnno.value();
                 }
             }
+            
+            return new PipelineHandler(function, inputNullable, outputNullable, inputCacheKey, outputCacheKey);
 
-            final boolean[] pair = {inputNullable, outputNullable};
-            return pair;
         } catch (NoSuchMethodException | SecurityException ex) {
             throw new RuntimeException(ex);
-        }
+        }                
     }
 }
