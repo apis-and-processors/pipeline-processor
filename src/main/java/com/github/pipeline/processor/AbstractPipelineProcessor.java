@@ -99,7 +99,7 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
         this.retryPolicy = (retryPolicy != null 
                 ? retryPolicy
                 : DEFAULT_RETRY_POLICY).abortOn(NullNotAllowedException.class, ProcessTimeTypeMismatchException.class);
-        this.runtimePipelineChecks = PipelineUtils.typeCheckPipeline(pipeline);        
+        this.runtimePipelineChecks = PipelineUtils.checkTimeScan(pipeline);        
     } 
     
     /**

@@ -72,12 +72,12 @@ public class PipelineUtilsTest {
     
     @Test (expectedExceptions = NullPointerException.class)
     public void testNPEOnNullPipeline() {
-        PipelineUtils.typeCheckPipeline(null);
+        PipelineUtils.checkTimeScan(null);
     }
     
     @Test
     public void testEmptyMapOnEmptyPipeline() {
-        assertTrue(PipelineUtils.typeCheckPipeline(Lists.newArrayList()).isEmpty());
+        assertTrue(PipelineUtils.checkTimeScan(Lists.newArrayList()).isEmpty());
     }
 
     @Test
@@ -85,7 +85,7 @@ public class PipelineUtilsTest {
         final List<PipelineHandler> pipeLine = Lists.newArrayList();
         pipeLine.add(PipelineHandler.newInstance(new Handler3()));
         pipeLine.add(PipelineHandler.newInstance(new Handler4()));
-        final Map<Integer, ClassType> typeChecks = PipelineUtils.typeCheckPipeline(pipeLine);
+        final Map<Integer, ClassType> typeChecks = PipelineUtils.checkTimeScan(pipeLine);
         assertTrue(typeChecks.isEmpty());
     }
     
@@ -94,7 +94,7 @@ public class PipelineUtilsTest {
         final List<PipelineHandler> pipeLine = Lists.newArrayList();
         pipeLine.add(PipelineHandler.newInstance(new Handler1()));
         pipeLine.add(PipelineHandler.newInstance(new Handler2()));
-        final Map<Integer, ClassType> typeChecks = PipelineUtils.typeCheckPipeline(pipeLine);
+        final Map<Integer, ClassType> typeChecks = PipelineUtils.checkTimeScan(pipeLine);
         assertTrue(typeChecks.size() == 1);
     }
     
@@ -103,7 +103,7 @@ public class PipelineUtilsTest {
         final List<PipelineHandler> pipeLine = Lists.newArrayList();
         pipeLine.add(PipelineHandler.newInstance(new Handler2()));
         pipeLine.add(PipelineHandler.newInstance(new Handler1()));
-        PipelineUtils.typeCheckPipeline(pipeLine);
+        PipelineUtils.checkTimeScan(pipeLine);
     }
     
     @Test (expectedExceptions = NullNotAllowedException.class)
@@ -111,6 +111,6 @@ public class PipelineUtilsTest {
         final List<PipelineHandler> pipeLine = Lists.newArrayList();
         pipeLine.add(PipelineHandler.newInstance(new Handler2()));
         pipeLine.add(null);
-        PipelineUtils.typeCheckPipeline(pipeLine);
+        PipelineUtils.checkTimeScan(pipeLine);
     }
 }

@@ -51,7 +51,7 @@ public class PipelineUtils {
      * @throws CheckTimeTypeMismatchException if any 2 types could not 
      *         successfully be matched.
      */
-    public static Map<Integer, ClassType> typeCheckPipeline(final List<? extends PipelineHandler> pipeline) {
+    public static Map<Integer, ClassType> checkTimeScan(final List<? extends PipelineHandler> pipeline) {
         checkNotNull(pipeline, "Cannot pass null pipeline");
         
         // if no pipeline handlers then return empty map.
