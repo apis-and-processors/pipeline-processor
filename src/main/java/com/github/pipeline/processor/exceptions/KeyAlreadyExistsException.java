@@ -15,26 +15,28 @@
  * limitations under the License.
  */
 
-package com.github.pipeline.processor;
+package com.github.pipeline.processor.exceptions;
 
 /**
- * Constants used globally within the PipelineProcessor.
+ * Meant to be thrown when a key, typically for a Map, already exists.
  * 
  * @author cdancy
  */
-public class PipelineConstants {
-   
-    public static final String FUNCTION_REGEX = "^java.util.function.Function$";
+public class KeyAlreadyExistsException extends RuntimeException {
     
-    public static final String NULL_ALLOWED_TYPE_REGEX = "^(com.github.aap.processor.tools.domain.Null|java.lang.Void)$";
-
-    // to satisfy PMD
-    public static final String INDEX_STRING = ") at index ";
+    public KeyAlreadyExistsException() {
+        super();
+    }
     
-    // to satisfy PMD
-    public static final String HANDLER_STRING = "Handler (";
-
-    private PipelineConstants() {
-        throw new UnsupportedOperationException("intentionally unimplemented");
+    public KeyAlreadyExistsException(final String message) {
+        super(message);
+    }
+    
+    public KeyAlreadyExistsException(final String message, final Throwable throwable) {
+        super(message, throwable);
+    }
+    
+    public KeyAlreadyExistsException(final Throwable throwable) {
+        super(throwable);
     }
 }

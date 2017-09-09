@@ -23,11 +23,13 @@ import com.github.aap.processor.tools.domain.Null;
 import com.github.pipeline.processor.annotations.Cache;
 import com.github.pipeline.processor.exceptions.CheckTimeCacheException;
 import com.github.pipeline.processor.exceptions.CheckTimeTypeMismatchException;
+import java.util.Map;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.assertj.core.util.Maps;
 import org.testng.annotations.Test;
 
 /**
@@ -38,11 +40,12 @@ import org.testng.annotations.Test;
 public class PipelineProcessorCachingTest {
 
     private final String cacheReferenceKey = "CacheReference";
-    
+    private final String cacheSetKey = "CacheSet";
+
     class HandlerWithCacheSetString implements Function<String, String> {
         
         @Override
-        @Cache("CacheSet")
+        @Cache(cacheSetKey)
         public String apply(final String object) {
             return object;
         }
@@ -51,7 +54,7 @@ public class PipelineProcessorCachingTest {
     class HandlerWithCacheSetObject implements Function<Object, Object> {
         
         @Override
-        @Cache("CacheSet")
+        @Cache(cacheSetKey)
         public Object apply(final Object object) {
             return object;
         }
@@ -112,7 +115,7 @@ public class PipelineProcessorCachingTest {
     class HandlerWithCacheGetString implements Function<String, Object> {
         
         @Override
-        public Object apply(@Cache("CacheSet") final String object) {
+        public Object apply(@Cache(cacheSetKey) final String object) {
             return object;
         }
     }
@@ -188,7 +191,7 @@ public class PipelineProcessorCachingTest {
     }
     
     @Test (expectedExceptions = CheckTimeCacheException.class)
-    public void testFailOnRetrievingNotSetCache() {
+    public void testFailOnNotSettingCacheOnNonNullOrVoidOutput() {
         PipelineProcessor.builder()
                 .handler(HandlerForStrings.class)
                 .handler(HandlerWithCacheGetString.class)
@@ -215,5 +218,46 @@ public class PipelineProcessorCachingTest {
                 .output(inputValue);
         assertThat(output).isNotNull();
         assertThat((String)output).isEqualTo(inputValue + "-1-2");
+    }
+    
+    @Test (expectedExceptions = CheckTimeCacheException.class)
+    public void testFailIfOutputsAlreadyAvailableWithinGlobalResources() {
+   
+        final Map<String, Object> globalResources = Maps.newHashMap();
+        globalResources.put(cacheSetKey, inputValue);
+        
+        final Object output = PipelineProcessor.builder()
+                .handler(HandlerWithCacheSetString.class)
+                .resources(globalResources)
+                .build()
+                .output();
+        assertThat(output).isNotNull();
+        assertThat((String)output).isEqualTo(inputValue);
+    }
+    
+    @Test (expectedExceptions = CheckTimeTypeMismatchException.class)
+    public void testFailIfWrongInputsAvailableWithinGlobalResources() {
+   
+        final Map<String, Object> globalResources = Maps.newHashMap();
+        globalResources.put(cacheSetKey, 123);
+        
+        PipelineProcessor.builder()
+                .handler(HandlerWithCacheGetString.class)
+                .resources(globalResources)
+                .build()
+                .output();
+    }
+    
+    @Test (expectedExceptions = CheckTimeCacheException.class)
+    public void testFailIfNoInputsAvailableWithinGlobalResources() {
+   
+        final Map<String, Object> globalResources = Maps.newHashMap();
+        globalResources.put("Hello World", 123);
+        
+        PipelineProcessor.builder()
+                .handler(HandlerWithCacheGetString.class)
+                .resources(globalResources)
+                .build()
+                .output();
     }
 }

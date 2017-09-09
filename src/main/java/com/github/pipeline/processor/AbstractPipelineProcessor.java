@@ -30,7 +30,6 @@ import com.github.pipeline.processor.exceptions.NullNotAllowedException;
 import com.github.pipeline.processor.exceptions.ProcessTimeTypeMismatchException;
 import com.github.pipeline.processor.utils.PipelineUtils;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
 
 import java.util.List;
 import java.util.Map;
@@ -64,6 +63,7 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
     public static final String SUCCESS_MESSAGE = "Execution was successful on {0}";
 
     protected final List<? extends PipelineHandler> pipeline;
+    protected final Map<String, Object> globalResources;
     protected final List<PipelineSubscription> subscribers;
     protected final RetryPolicy retryPolicy;
     protected final Map<Integer, ClassType> runtimePipelineChecks;
@@ -72,14 +72,17 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
      * Create PipelineProcessor from pre-built pipeline with optional Subscribers.
      * 
      * @param pipeline pipeline to process
+     * @param globalResources optional globalResources for pipeline to use
      * @param subscribers optional subscribers to get callback notifications
      * @param retryPolicy optional RetryPolicy to use for this pipeline
      */
-    public AbstractPipelineProcessor(final List<? extends PipelineHandler> pipeline, 
+    public AbstractPipelineProcessor(final List<? extends PipelineHandler> pipeline,
+            final Map<String, Object> globalResources,
             final List<Subscriber> subscribers, 
             final RetryPolicy retryPolicy) {
         
         this.pipeline = pipeline;
+        this.globalResources = globalResources;
 
         // generate Subscription object for each Subscriber
         if (subscribers != null && subscribers.size() > 0) {
@@ -99,7 +102,7 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
         this.retryPolicy = (retryPolicy != null 
                 ? retryPolicy
                 : DEFAULT_RETRY_POLICY).abortOn(NullNotAllowedException.class, ProcessTimeTypeMismatchException.class);
-        this.runtimePipelineChecks = PipelineUtils.checkTimeScan(pipeline);        
+        this.runtimePipelineChecks = PipelineUtils.checkTimeScan(pipeline, globalResources);        
     } 
     
     /**
@@ -118,8 +121,8 @@ public abstract class AbstractPipelineProcessor<V,R> implements Function<V, R> {
         // holds the starting point of next handler to execute
         final AtomicInteger indexReference = new AtomicInteger(0);
         
-        // local cache for handlers to set/get and pass amongst themselves
-        final Map<String, Object> cache = Maps.newHashMap();
+        // local cache for handlers to set/get and pass values amongst themselves
+        final PipelineResources cache = new PipelineResources(globalResources);
 
         Failsafe.with(retryPolicy)
                 .onFailedAttempt(failure ->  {

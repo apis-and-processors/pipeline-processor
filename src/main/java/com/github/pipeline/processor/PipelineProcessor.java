@@ -25,6 +25,7 @@ import com.github.aap.processor.tools.ReflectionMagic;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,8 +41,11 @@ import org.reactivestreams.Subscriber;
  */
 public class PipelineProcessor extends AbstractPipelineProcessor {
     
-    private PipelineProcessor(final List<? extends PipelineHandler> pipeline, final List<Subscriber> subscribers, final RetryPolicy retryPolicy) {
-        super(pipeline, subscribers, retryPolicy);
+    private PipelineProcessor(final List<? extends PipelineHandler> pipeline,
+            final Map resources,
+            final List<Subscriber> subscribers,
+            final RetryPolicy retryPolicy) {
+        super(pipeline, resources, subscribers, retryPolicy);
     }
     
     /**
@@ -74,6 +78,7 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
         private final Logger logger = Logger.getLogger(PipelineProcessor.class.getName());
         private final List<PipelineHandler> pipelineHandlers = Lists.newArrayList();
         private final List<Subscriber> subscribers = Lists.newArrayList();
+        private Map<String, Object> globalResources;
         private RetryPolicy retryPolicy;
         
         /**
@@ -140,9 +145,9 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
         }
         
         /**
-         * Add a RetryPolicy to this PipelineProcessor
+         * Add a RetryPolicy to this PipelineProcessor.
          * 
-         * @param retryPolicy the RetryPolicy to add to this PipelineProcessor
+         * @param retryPolicy the RetryPolicy to add to this PipelineProcessor.
          * @return this Builder.
          */
         public Builder retryPolicy(final RetryPolicy retryPolicy) {
@@ -151,13 +156,31 @@ public class PipelineProcessor extends AbstractPipelineProcessor {
         }
         
         /**
-         * Build a PipelineProcessor from passed build parameters.
+         * Add globalResources for this Pipeline to use. Because globalResources can be used
+         * as an input into a given handler via the @Cache("some-key") annotation
+         * we will convert the passed Map into an UmodifiableMap so as **not** to 
+         * lose state while potentially N number of invocations of this pipeline-processor 
+         * are being run.
+         * 
+         * @param globalResources the globalResources (e.g. Map) to add to this PipelineProcessor.
+         * @return this Builder.
+         */
+        public Builder resources(final Map<String, Object> globalResources) {
+            this.globalResources = checkNotNull(globalResources, "resources cannot be null");
+            return this;
+        }
+        
+        /**
+         * Create a PipelineProcessor from passed build parameters.
          * 
          * @return newly created PipelineProcessor.
          */
         public PipelineProcessor build() {
             checkArgument(!pipelineHandlers.isEmpty(), "Cannot build " + PipelineProcessor.class.getSimpleName() + " with no handlers");
-            return new PipelineProcessor(Collections.unmodifiableList(pipelineHandlers), subscribers, this.retryPolicy);
+            return new PipelineProcessor(Collections.unmodifiableList(this.pipelineHandlers),
+                    this.globalResources != null ? Collections.unmodifiableMap(this.globalResources) : null,
+                    this.subscribers,
+                    this.retryPolicy);
         }
     }
 }

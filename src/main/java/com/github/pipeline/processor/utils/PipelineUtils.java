@@ -18,11 +18,13 @@
 package com.github.pipeline.processor.utils;
 
 import static com.github.pipeline.processor.PipelineConstants.FUNCTION_REGEX;
+import static com.github.pipeline.processor.PipelineConstants.HANDLER_STRING;
 import static com.github.pipeline.processor.PipelineConstants.INDEX_STRING;
 import static com.github.pipeline.processor.PipelineConstants.NULL_ALLOWED_TYPE_REGEX;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.github.aap.processor.tools.ClassTypeParser;
 import com.github.aap.processor.tools.domain.ClassType;
 import com.github.aap.processor.tools.exceptions.TypeMismatchException;
 import com.github.pipeline.processor.exceptions.NullNotAllowedException;
@@ -31,27 +33,30 @@ import com.github.pipeline.processor.exceptions.CheckTimeTypeMismatchException;
 import com.github.pipeline.processor.PipelineHandler;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Random static methods for use within this PipelineProcessor. 
+ * Static methods for use within this PipelineProcessor. 
  * 
  * @author cdancy
  */
+@SuppressWarnings("PMD.TooManyStaticImports")
 public class PipelineUtils {
 
     /**
-     * Checks each PipelineHandler to its successor to ensure all types 
-     * match as expected.
+     * Checks each PipelineHandler to its successor (or potentially cache) to 
+     * ensure all types match as expected.
      * 
      * @param pipeline to check for type mis-matches.
+     * @param globalResources potentially null map (though if not will be unmodifiable) 
+     *        containing objects passed in by user to be used within pipeline.
      * @return Map where key is the index, and value is the ClassType, of
      *         further checks that need to be made at runtime.
-     * @throws CheckTimeTypeMismatchException if any 2 types could not 
-     *         successfully be matched.
      */
-    public static Map<Integer, ClassType> checkTimeScan(final List<? extends PipelineHandler> pipeline) {
+    public static Map<Integer, ClassType> checkTimeScan(final List<? extends PipelineHandler> pipeline, final Map<String, Object> globalResources) {
         checkNotNull(pipeline, "Cannot pass null pipeline");
         
         // if no pipeline handlers then return empty map.
@@ -69,57 +74,111 @@ public class PipelineUtils {
                 throw new NullNotAllowedException("Found NULL PipelineHandler at index " + i);
             }
 
-            // check if current handler has an output cache-key and ensure
-            // it's unique before continuing.
+            // 1.) Various checks surrounding a handlers outputCacheKey.
             final ClassType currentClazzType = currentHandler.classType().firstSubTypeMatching(FUNCTION_REGEX);
             if (currentHandler.outputCacheKey() != null) {
 
+                // 1.1) check local cache for object
                 final CacheSet previousCacheSet = cacheSets.get(currentHandler.outputCacheKey());
                 if (previousCacheSet == null) {
-                    cacheSets.put(currentHandler.outputCacheKey(), 
-                            CacheSet.newInstance(currentHandler.getClass().getName(), 
-                                    i, currentClazzType.subTypeAtIndex(1)));
+                    
+                    // 1.2) check global resources for object
+                    final Object possibleObj = (globalResources != null) 
+                            ? globalResources.get(currentHandler.outputCacheKey())
+                            : null;
+                    if (possibleObj == null) {
+                        cacheSets.put(currentHandler.outputCacheKey(), 
+                                CacheSet.newInstance(currentHandler.id(), 
+                                        i, currentClazzType.subTypeAtIndex(1)));
+                    } else {
+                        throw new CheckTimeCacheException(HANDLER_STRING 
+                            + currentHandler.id() + INDEX_STRING + i + " " 
+                            + "is attempting to set cache-key '" + currentHandler.outputCacheKey() + "' "
+                            + "previously in use within globalResources");
+                    }
                 } else {
-                    throw new CheckTimeCacheException("Handler (" 
-                        + currentHandler.getClass().getName() + INDEX_STRING + i + " " 
+                    throw new CheckTimeCacheException(HANDLER_STRING 
+                        + currentHandler.id() + INDEX_STRING + i + " " 
                         + "is attempting to set cache-key '" + currentHandler.outputCacheKey() + "' "
                         + "previously in use by Handler (" 
                         + previousCacheSet.name + INDEX_STRING + previousCacheSet.index);
                 }
             }
             
-            // we can only compare to a previous handler so continue
-            // only if we are past the first index.
-            if (i > 0) {
+            // 2.) Various checks surrounding the potential previous handler in relation to this handler.
+            final PipelineHandler previousHandler = (i > 0) ? pipeline.get(i - 1) : null;
+            ClassType previousSubType = null; // used for comparing against currentSubType
+            String previousSubTypeSourceName = null; // used for filling out exception message
+            if (previousHandler != null) {
                 
-                final PipelineHandler previousHandler = pipeline.get(i - 1);
+                previousSubTypeSourceName = previousHandler.id();
+                previousSubType = previousHandler.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(1);
 
-                // special case when the previous handler sets a cache and the
+                // Special case when the previous handler sets a cache and the
                 // current handler accepts a NULL/VOID thus comparison need
                 // not be performed and we can skip to next iteration of loop.
                 if (previousHandler.outputCacheKey() != null 
                         && currentClazzType.subTypeAtIndex(0).toString().matches(NULL_ALLOWED_TYPE_REGEX)) {
                     continue;
                 }
+
+                // Special case to test when previous handler outputs a value, but is not cached
+                // and is not void/null, but the current handler expects something from the cache.
+                // This leads to a handler within the pipeline returning an output that is 
+                // essentially gone to the ether with no one using it which is not something
+                // we should permit.
+                if (previousHandler.outputCacheKey() == null 
+                        && currentHandler.inputCacheKey() != null
+                        && !previousSubType.toString().matches(NULL_ALLOWED_TYPE_REGEX)) {
+                    throw new CheckTimeCacheException(HANDLER_STRING 
+                            + previousSubTypeSourceName + INDEX_STRING + (i - 1) + " " 
+                            + "declares an output (" + previousSubType + ") not designated for cache while Handler (" 
+                            + currentHandler.id() + INDEX_STRING + i 
+                            + " expects an input from cache:" 
+                            + " only objects of type Null/Void can be returned in this context");
+                }
+            }
+
+            // 3.) Various checks surrounding a handler's inputCacheKey
+            if (currentHandler.inputCacheKey() != null) {
                 
-                ClassType previousSubType = null;
-                if (currentHandler.inputCacheKey() != null) {
-                    final CacheSet previousCacheSet = cacheSets.get(currentHandler.inputCacheKey());
-                    if (previousCacheSet != null) {
-                        previousCacheSet.numTimesUsed += 1;
-                        previousSubType = previousCacheSet.classType;
-                    } else {
-                        throw new CheckTimeCacheException("Handler (" 
-                            + currentHandler.getClass().getName() + INDEX_STRING + i + " " 
-                            + "failed attempting to get cache-key '" + currentHandler.inputCacheKey() + "', "
-                            + "valid keys at this point are: " + cacheSets.keySet());
+                // 1.) check local cache for object
+                CacheSet previousCacheSet = cacheSets.get(currentHandler.inputCacheKey());
+                if (previousCacheSet == null) {
+                    
+                    // 2.) check global resources for object
+                    final Object possibleObj = (globalResources != null) 
+                            ? globalResources.get(currentHandler.inputCacheKey())
+                            : null;
+                    if (possibleObj != null) {
+                        previousSubTypeSourceName = "globalResource";
+                        previousCacheSet = CacheSet.newInstance(previousSubTypeSourceName, 
+                                        -1, ClassTypeParser.parse(possibleObj));
+                        cacheSets.put(currentHandler.inputCacheKey(), previousCacheSet);
                     }
                 } else {
-                    previousSubType = previousHandler.classType().firstSubTypeMatching(FUNCTION_REGEX).subTypeAtIndex(1);
+                    previousSubTypeSourceName = previousCacheSet.name;
                 }
+                
+                if (previousCacheSet != null) {
+                    previousCacheSet.numTimesUsed += 1;
+                    previousSubType = previousCacheSet.classType;
+                } else {
+                    final Set<String> allSets = Sets.newHashSet(cacheSets.keySet());
+                    if (globalResources != null) {
+                        allSets.addAll(globalResources.keySet());
+                    }
+                    
+                    throw new CheckTimeCacheException(HANDLER_STRING 
+                        + currentHandler.id() + INDEX_STRING + i + " " 
+                        + "failed attempting to get cache-key '" + currentHandler.inputCacheKey() + "', "
+                        + "valid keys at this point are: " + allSets);
+                }
+            }
 
-                // do the actual comparison of previous the handler's
-                // output to the current handler's inputs.
+            // 4.) If applicable compare previous handler's output (could come from cache)
+            //     to the current handler's input (could also have come from cache).
+            if (previousSubType != null) {
                 try {
                     final ClassType currentSubType = currentClazzType.subTypeAtIndex(0);
                     final int index = previousSubType.compare(currentSubType);
@@ -127,15 +186,16 @@ public class PipelineUtils {
                         runtimePipelineChecks.put(index, currentSubType);
                     }
                 } catch (TypeMismatchException tme) {
-                    throw new CheckTimeTypeMismatchException("Handler (" 
-                            + previousHandler.getClass().getName() + INDEX_STRING + (i - 1) + " " 
+                    throw new CheckTimeTypeMismatchException(HANDLER_STRING 
+                            + previousSubTypeSourceName + INDEX_STRING + (i - 1) + " " 
                             + "outputs do not match Handler (" 
-                            + currentHandler.getClass().getName() + INDEX_STRING + i + " inputs.", tme);
+                            + currentHandler.id() + INDEX_STRING + i + " inputs.", tme);
                 }
             }
         }
         
-        // ensure all cache-sets are numTimesUsed and throw exception if at least 1 is not.
+        // 5.) Final check to ensure all cache-sets are used at least once 
+        //     and throw an exception if they are not.
         final List<String> unusedCacheKeys = Lists.newArrayListWithCapacity(cacheSets.size());
         for (final Map.Entry<String, CacheSet> entry : cacheSets.entrySet()) {
             if (entry.getValue().numTimesUsed == 0) {
@@ -155,6 +215,7 @@ public class PipelineUtils {
      * value that was added to cache during "check time".
      */
     private static class CacheSet {
+        
         public final String name;
         public final int index;
         public final ClassType classType;
