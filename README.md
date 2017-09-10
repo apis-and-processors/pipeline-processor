@@ -21,6 +21,8 @@ While designing the [api-processor](https://github.com/apis-and-processors/api-p
 function was analagous to processing a pipeline (i.e. the output of one function is the input to the next). With that in mind the need 
 for a generic way to process java Functions in a pipeline fashion was needed.
 
+A pipeline can be thought of as an assembly line where some material goes in, that material gets worked on by X number of individuals, and at the very end we get the culmination of that work. The same is true here: you pass in a single `input` ( with optional `resources`), each `handler` then works on said `input` and passes along their `output` to the successive `handler`, the result of which comes from the `output` of the last handler in the pipeline.
+
 ## On what "type checked" pipeline means
 
 As there is no sane and programattic way to tell whether any 2 handlers, at compile time, have matching output-to-input types we have 
