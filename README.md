@@ -66,15 +66,15 @@ Often times it is desirable to accept or return a potentially null value. By def
         @Nullable
         public String apply(String input) {
             if (input.equals("HelloWorld")) {
-	        return null;
-	    } else {
-	        return input;
-	    }
+                return null;
+            } else {
+               return input;
+            } 
         }
     }
     
     class MySecondHandler implements Function<String, Integer> {
-        
+
         public Integer apply(@Nullable String input) {
             if (input == null) {
                 return -1;
