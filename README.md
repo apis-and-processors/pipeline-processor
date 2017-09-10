@@ -61,19 +61,36 @@ You can optionally give an input to the first Function within the processor (ass
 
 Often times it is desirable to accept or return a potentially null value. By default `pipeline-processor` guards against this and will throw a `NullNotAllowedException` should a null be passed to or returned from any `Function` which does not allow it. To get around this you can annotate the output (i.e. the method definition) or the input (i.e. method parameter) with `@Nullable` to ensure no exception is thrown. Consider the following:
 
-    class MyHandler implements Function<String, Integer> {
+    class MyFirstHandler implements Function<String, String> {
         
         @Nullable
-        public Integer apply(@Nullable String object) {
-            if (object == null) {
-                return null;
+        public String apply(String input) {
+            if (input.equals("HelloWorld")) {
+	        return null;
+	    } else {
+	        return input;
+	    }
+        }
+    }
+    
+    class MySecondHandler implements Function<String, Integer> {
+        
+        public Integer apply(@Nullable String input) {
+            if (input == null) {
+                return -1;
             } else {
-                Integer.valueOf(object);
+                return 0;
             }
         }
     }
+    
+    PipelineProcessor processor = PipelineProcessor.builder()
+        .handler(MyFirstHandler.class)
+        .handler(MySecondHandler.class).build();
+    int exitCode = (int)processor.output("HelloWorld");
+    
 
-The `MyHandler` class allows for null to be passed in as input by having the `String` parameter annotated with `@Nullable`. It also allows for null to be returned by annotating the output with `@Nullable`.
+In this example the `MyFirstHandler` class doesn't like when the String `HelloWorld` is passed in and as such will return null. This is legal here as the method definition (i.e. the `output`) is annotated with `@Nullable` otherwise we'd have gotten a `NullNotAllowedException`. The `MySecondHandler` class has its parameter (i.e. the `input`) is annotated with `@Nullable` as well meaning it will validly accept the null output from the previous `MyFirstHandler` class.
 
 ## On RetryPolicy
 
