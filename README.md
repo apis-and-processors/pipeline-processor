@@ -68,7 +68,7 @@ Often times it is desirable to accept or return a potentially null value. By def
             if (input.equals("HelloWorld")) {
                 return null;
             } else {
-               return input;
+                return input;
             } 
         }
     }
